@@ -47,6 +47,12 @@ return [
         'token_key'    => env('BUNNY_STREAM_TOKEN_KEY'),    // pour signed URLs
         'signed_urls'  => env('BUNNY_STREAM_SIGNED_URLS', true),
         'token_ttl'    => (int) env('BUNNY_STREAM_TOKEN_TTL', 3600), // secondes
+        // Téléchargement offline (app mobile) : qualité max servie et
+        // durée de validité de l'URL signée renvoyée par /watch/.../download.
+        // Plus longue que `token_ttl` car un téléchargement peut être lent
+        // et reprendre en arrière-plan.
+        'download_max_height' => (int) env('BUNNY_DOWNLOAD_MAX_HEIGHT', 720),
+        'download_token_ttl'  => (int) env('BUNNY_DOWNLOAD_TOKEN_TTL', 21600), // 6h
     ],
 
     /*

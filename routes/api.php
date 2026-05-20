@@ -87,6 +87,21 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/watch/movie/{movie}',     [WatchApiController::class, 'movie']);
         Route::get('/watch/episode/{episode}', [WatchApiController::class, 'episode']);
+
+        // Téléchargement offline : URL MP4 signée à durée de vie courte.
+        // Throttle : 30 demandes / heure / utilisateur — large pour un
+        // usage normal (binge offline d'une série) mais coupe net une
+        // énumération automatisée du catalogue.
+        Route::middleware('throttle:30,60')->group(function () {
+            Route::get(
+                '/watch/movie/{movie}/download',
+                [WatchApiController::class, 'movieDownload']
+            );
+            Route::get(
+                '/watch/episode/{episode}/download',
+                [WatchApiController::class, 'episodeDownload']
+            );
+        });
     });
 
     // -------------------------------------------------------------
