@@ -49,7 +49,7 @@ class CategorySeeder extends Seeder
         ];
 
         foreach ($mainCategories as $category) {
-            Category::create($category);
+            Category::firstOrCreate(['slug' => $category['slug']], $category);
         }
 
         // Genres de Films et Séries
@@ -162,7 +162,7 @@ class CategorySeeder extends Seeder
         ];
 
         foreach ($genres as $genre) {
-            Category::create($genre);
+            Category::firstOrCreate(['slug' => $genre['slug']], $genre);
         }
 
         // Catégories spécifiques aux Cours de Cinéma
@@ -205,7 +205,7 @@ class CategorySeeder extends Seeder
         ];
 
         foreach ($courseCategories as $course) {
-            Category::create($course);
+            Category::firstOrCreate(['slug' => $course['slug']], $course);
         }
 
         // Catégories pour les projets de financement
@@ -238,7 +238,7 @@ class CategorySeeder extends Seeder
         ];
 
         foreach ($projectCategories as $project) {
-            Category::create($project);
+            Category::firstOrCreate(['slug' => $project['slug']], $project);
         }
 
         // Catégories Lions Head Awards
@@ -281,7 +281,7 @@ class CategorySeeder extends Seeder
         ];
 
         foreach ($awardsCategories as $award) {
-            Category::create($award);
+            Category::firstOrCreate(['slug' => $award['slug']], $award);
         }
     }
 }

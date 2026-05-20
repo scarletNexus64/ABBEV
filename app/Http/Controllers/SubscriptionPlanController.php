@@ -40,9 +40,6 @@ class SubscriptionPlanController extends Controller
             'order' => 'nullable|integer',
         ]);
 
-        // Pas de json_encode : le modèle a un cast 'features' => 'array',
-        // Eloquent sérialise automatiquement. Doubler ici produit du JSON
-        // double-encodé en DB qui casse les clients API.
         $validated['features'] = $validated['features'] ?? [];
         $validated['is_active'] = $request->has('is_active');
         $validated['is_popular'] = $request->has('is_popular');
@@ -72,8 +69,6 @@ class SubscriptionPlanController extends Controller
             'order' => 'nullable|integer',
         ]);
 
-        // Pas de json_encode : le cast 'features' => 'array' du modèle s'en
-        // charge. Doubler aurait pour effet de stocker du JSON double-encodé.
         $validated['features'] = $validated['features'] ?? [];
         $validated['is_active'] = $request->has('is_active');
         $validated['is_popular'] = $request->has('is_popular');

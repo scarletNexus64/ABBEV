@@ -15,21 +15,25 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         // Create admin user
-        User::create([
-            'name' => 'Admin',
-            'email' => 'admin@abbev.com',
-            'password' => Hash::make('password'),
-            'role' => 'admin',
-            'email_verified_at' => now(),
-        ]);
+        User::firstOrCreate(
+            ['email' => 'admin@abbev.com'],
+            [
+                'name' => 'Admin',
+                'password' => Hash::make('password'),
+                'role' => 'admin',
+                'email_verified_at' => now(),
+            ]
+        );
 
         // Create a regular user
-        User::create([
-            'name' => 'User Test',
-            'email' => 'user@abbev.com',
-            'password' => Hash::make('password'),
-            'role' => 'user',
-            'email_verified_at' => now(),
-        ]);
+        User::firstOrCreate(
+            ['email' => 'user@abbev.com'],
+            [
+                'name' => 'User Test',
+                'password' => Hash::make('password'),
+                'role' => 'user',
+                'email_verified_at' => now(),
+            ]
+        );
     }
 }

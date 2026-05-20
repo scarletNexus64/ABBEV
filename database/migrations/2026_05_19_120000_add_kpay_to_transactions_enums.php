@@ -29,6 +29,16 @@ return new class extends Migration
             return;
         }
 
+        if ($driver === 'pgsql') {
+            // PostgreSQL : remplacer les contraintes CHECK.
+            DB::statement("ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_payment_method_check");
+            DB::statement("ALTER TABLE transactions ADD CONSTRAINT transactions_payment_method_check CHECK (payment_method::text = ANY (ARRAY['cash','card','mobile','paypal','freemopay','fedapay','kpay']::text[]))");
+            DB::statement("ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check");
+            DB::statement("ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type::text = ANY (ARRAY['subscription','purchase','refund','withdrawal']::text[]))");
+
+            return;
+        }
+
         // MySQL / MariaDB : MODIFY COLUMN avec le nouvel enum.
         DB::statement("ALTER TABLE transactions MODIFY payment_method ENUM('cash','card','mobile','paypal','freemopay','fedapay','kpay') NOT NULL DEFAULT 'mobile'");
         DB::statement("ALTER TABLE transactions MODIFY type ENUM('subscription','purchase','refund','withdrawal') NOT NULL DEFAULT 'subscription'");
@@ -43,6 +53,15 @@ return new class extends Migration
                 'payment_method' => ['cash', 'card', 'mobile', 'paypal', 'freemopay', 'fedapay'],
                 'type'           => ['subscription', 'purchase', 'refund'],
             ]);
+
+            return;
+        }
+
+        if ($driver === 'pgsql') {
+            DB::statement("ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_payment_method_check");
+            DB::statement("ALTER TABLE transactions ADD CONSTRAINT transactions_payment_method_check CHECK (payment_method::text = ANY (ARRAY['cash','card','mobile','paypal','freemopay','fedapay']::text[]))");
+            DB::statement("ALTER TABLE transactions DROP CONSTRAINT IF EXISTS transactions_type_check");
+            DB::statement("ALTER TABLE transactions ADD CONSTRAINT transactions_type_check CHECK (type::text = ANY (ARRAY['subscription','purchase','refund']::text[]))");
 
             return;
         }
