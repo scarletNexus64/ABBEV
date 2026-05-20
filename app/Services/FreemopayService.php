@@ -18,12 +18,6 @@ class FreemopayService
         $this->baseUrl = Configuration::getValue('freemopay_base_url', 'https://api-v2.freemopay.com');
         $this->appKey = Configuration::getValue('freemopay_app_key');
         $this->secretKey = Configuration::getValue('freemopay_secret_key');
-
-        Log::debug('[FreemopayService] Service initialized', [
-            'baseUrl' => $this->baseUrl,
-            'has_app_key' => !empty($this->appKey),
-            'has_secret_key' => !empty($this->secretKey),
-        ]);
     }
 
     /**
@@ -32,10 +26,6 @@ class FreemopayService
     public function generateToken(): ?string
     {
         try {
-            Log::debug('[FreemopayService] Generating token...', [
-                'url' => "{$this->baseUrl}/api/v2/payment/token",
-            ]);
-
             // FreeMoPay attend un JSON body
             $response = Http::asJson()
                 ->post("{$this->baseUrl}/api/v2/payment/token", [
@@ -43,15 +33,9 @@ class FreemopayService
                     'secretKey' => $this->secretKey,
                 ]);
 
-            Log::debug('[FreemopayService] Token response', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-
             if ($response->successful()) {
                 $data = $response->json();
                 $this->token = $data['access_token'] ?? null;
-                Log::info('[FreemopayService] ✅ Token generated successfully');
                 return $this->token;
             }
 
@@ -77,11 +61,6 @@ class FreemopayService
         }
 
         try {
-            Log::debug('[FreemopayService] Initializing payment...', [
-                'amount' => $params['amount'],
-                'phone' => $params['phone_number'],
-            ]);
-
             $response = Http::withToken($this->token)
                 ->asJson()
                 ->post("{$this->baseUrl}/api/v2/payment", [
@@ -93,11 +72,6 @@ class FreemopayService
                 ]);
 
             $data = $response->json();
-
-            Log::debug('[FreemopayService] Payment init response', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
 
             if ($response->successful()) {
                 return [
@@ -133,12 +107,6 @@ class FreemopayService
                 ->get("{$this->baseUrl}/api/v2/payment/{$reference}");
 
             $data = $response->json();
-
-            Log::debug('[FreemopayService] Status check response', [
-                'reference' => $reference,
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
 
             return [
                 'success' => $response->successful(),
@@ -203,12 +171,6 @@ class FreemopayService
 
             $data = $response->json();
 
-            Log::debug('[FreemopayService] Disbursement status response', [
-                'reference' => $reference,
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
-
             return [
                 'status' => $data['status'] ?? 'UNKNOWN',
                 'reference' => $reference,
@@ -247,12 +209,6 @@ class FreemopayService
         }
 
         try {
-            Log::info('[FreemopayService] Initiating disbursement...', [
-                'amount' => $params['amount'],
-                'receiver' => $params['phone_number'],
-                'external_id' => $params['external_reference'] ?? null,
-            ]);
-
             $response = Http::withBasicAuth($this->appKey, $this->secretKey)
                 ->asJson()
                 ->timeout(30)
@@ -262,11 +218,6 @@ class FreemopayService
                     'externalId' => $params['external_reference'] ?? 'WITHDRAW-' . time(),
                     'callback' => $params['callback_url'] ?? url('/api/webhooks/freemopay-disbursement'),
                 ]);
-
-            Log::debug('[FreemopayService] Disbursement response', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-            ]);
 
             if (!$response->successful()) {
                 Log::error('FreemoPay disbursement error', [
@@ -283,11 +234,6 @@ class FreemopayService
             }
 
             $data = $response->json();
-
-            Log::info('[FreemopayService] ✅ Disbursement initiated successfully', [
-                'reference' => $data['reference'] ?? null,
-                'status' => $data['status'] ?? null,
-            ]);
 
             return [
                 'success' => true,

@@ -49,11 +49,9 @@ class ConfigurationSeeder extends Seeder
             // ============================================
             // PAYPAL
             // ============================================
-            ['key' => 'paypal_enabled', 'value' => '0', 'group' => 'paypal', 'description' => 'Activer les paiements PayPal', 'is_secret' => false],
             ['key' => 'paypal_mode', 'value' => 'sandbox', 'group' => 'paypal', 'description' => 'Mode (sandbox ou live)', 'is_secret' => false],
             ['key' => 'paypal_client_id', 'value' => '', 'group' => 'paypal', 'description' => 'Client ID PayPal', 'is_secret' => true],
             ['key' => 'paypal_client_secret', 'value' => '', 'group' => 'paypal', 'description' => 'Client Secret PayPal', 'is_secret' => true],
-            ['key' => 'paypal_webhook_id', 'value' => '', 'group' => 'paypal', 'description' => 'PayPal Webhook ID', 'is_secret' => true],
             ['key' => 'paypal_currency', 'value' => 'USD', 'group' => 'paypal', 'description' => 'Devise PayPal', 'is_secret' => false],
             ['key' => 'paypal_exchange_rate', 'value' => '655', 'group' => 'paypal', 'description' => 'Taux de change USD vers XAF', 'is_secret' => false],
 
@@ -84,6 +82,15 @@ class ConfigurationSeeder extends Seeder
             ['key' => 'freemopay_token_cache_duration', 'value' => '3000', 'group' => 'freemopay', 'description' => 'Durée cache token (secondes) - 50 min', 'is_secret' => false],
             ['key' => 'freemopay_retry_attempts', 'value' => '5', 'group' => 'freemopay', 'description' => 'Nombre de tentatives de retry', 'is_secret' => false],
             ['key' => 'freemopay_retry_delay', 'value' => '0.5', 'group' => 'freemopay', 'description' => 'Délai entre tentatives (secondes)', 'is_secret' => false],
+
+            // ============================================
+            // KPAY
+            // ============================================
+            ['key' => 'kpay_enabled', 'value' => '0', 'group' => 'kpay', 'description' => 'Activer les paiements KPay', 'is_secret' => false],
+            ['key' => 'kpay_base_url', 'value' => 'https://admin.kpay.site', 'group' => 'kpay', 'description' => 'URL de base KPay', 'is_secret' => false],
+            ['key' => 'kpay_api_key', 'value' => '', 'group' => 'kpay', 'description' => 'API Key KPay', 'is_secret' => true],
+            ['key' => 'kpay_secret_key', 'value' => '', 'group' => 'kpay', 'description' => 'Secret Key KPay', 'is_secret' => true],
+            ['key' => 'kpay_max_duration', 'value' => '300', 'group' => 'kpay', 'description' => 'Durée max attente statut final (secondes)', 'is_secret' => false],
 
             // ============================================
             // NEXAH SMS

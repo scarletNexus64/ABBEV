@@ -18,6 +18,10 @@ class Media extends Model
         'release_year',
         'seasons',
         'video_path',
+        'video_provider',
+        'video_id',
+        'video_library_id',
+        'video_metadata',
         'thumbnail_path',
         'banner_path',
         'cover_path',
@@ -27,13 +31,33 @@ class Media extends Model
     ];
 
     protected $casts = [
-        'published_at' => 'datetime',
-        'is_featured' => 'boolean',
+        'published_at'   => 'datetime',
+        'is_featured'    => 'boolean',
+        'video_metadata' => 'array',
     ];
 
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /**
+     * URL du lecteur iframe Bunny Stream pour ce média (films uniquement).
+     * Retourne null si aucune vidéo Bunny n'est attribuée.
+     */
+    public function bunnyEmbedUrl(): ?string
+    {
+        if ($this->video_provider !== 'bunny' || empty($this->video_id)) {
+            return null;
+        }
+
+        $libraryId = $this->video_library_id ?: config('services.bunny.library_id');
+
+        if (empty($libraryId)) {
+            return null;
+        }
+
+        return "https://iframe.mediadelivery.net/embed/{$libraryId}/{$this->video_id}";
     }
 
     /**

@@ -9,7 +9,7 @@
         <h2 class="text-2xl font-bold text-white mb-2">Séries</h2>
         <p class="text-gray-400">Explorez notre collection de séries TV</p>
     </div>
-    <a href="{{ route('media.create') }}"
+    <a href="{{ route('media.create', ['type' => 'series']) }}"
        class="bg-gradient-to-r from-primary-500 to-primary-600 hover:shadow-lg hover:shadow-primary-500/50 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center gap-2">
         <i class="fas fa-plus"></i>
         Ajouter une série
@@ -126,7 +126,7 @@
             </div>
             <h3 class="text-xl font-semibold text-white mb-2">Aucune série trouvée</h3>
             <p class="text-gray-400 mb-6">Commencez par ajouter des séries à votre collection</p>
-            <a href="{{ route('media.create') }}"
+            <a href="{{ route('media.create', ['type' => 'series']) }}"
                class="inline-flex items-center gap-2 bg-gradient-to-r from-primary-500 to-primary-600 hover:shadow-lg hover:shadow-primary-500/50 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300">
                 <i class="fas fa-plus"></i>
                 Ajouter une série

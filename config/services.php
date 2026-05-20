@@ -35,4 +35,33 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Bunny Stream (hébergement + transcodage HLS des films/séries)
+    |--------------------------------------------------------------------------
+    */
+    'bunny' => [
+        'library_id'   => env('BUNNY_STREAM_LIBRARY_ID'),
+        'api_key'      => env('BUNNY_STREAM_API_KEY'),
+        'cdn_hostname' => env('BUNNY_STREAM_CDN_HOSTNAME'), // ex: vz-xxxxxxxx.b-cdn.net
+        'token_key'    => env('BUNNY_STREAM_TOKEN_KEY'),    // pour signed URLs
+        'signed_urls'  => env('BUNNY_STREAM_SIGNED_URLS', true),
+        'token_ttl'    => (int) env('BUNNY_STREAM_TOKEN_TTL', 3600), // secondes
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | KPay (paiements & retraits Mobile Money — USSD ou passerelle hébergée)
+    |--------------------------------------------------------------------------
+    | La configuration effective lue par le SDK reste config/kpay.php.
+    | Ce bloc sert de référence centralisée des variables d'environnement.
+    */
+    'kpay' => [
+        'base_url'       => env('KPAY_BASE_URL', 'https://admin.kpay.site'),
+        'api_key'        => env('KPAY_API_KEY'),
+        'secret_key'     => env('KPAY_SECRET_KEY'),
+        'gateway_secret' => env('KPAY_GATEWAY_SECRET'),
+        'max_duration'   => (int) env('KPAY_MAX_DURATION', 300),
+    ],
+
 ];

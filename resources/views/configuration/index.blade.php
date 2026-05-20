@@ -18,64 +18,58 @@
     </div>
 </div>
 
-<form action="{{ route('configuration.update') }}" method="POST" x-data="configForm()">
-    @csrf
+@php
+    $groupMeta = [
+        'general'       => ['icon' => 'fas fa-cog',          'color' => 'text-primary-400', 'label' => 'Général'],
+        'maintenance'   => ['icon' => 'fas fa-tools',        'color' => 'text-orange-400',  'label' => 'Maintenance'],
+        'system'        => ['icon' => 'fas fa-server',       'color' => 'text-cyan-400',    'label' => 'Système'],
+        'paypal'        => ['icon' => 'fab fa-paypal',       'color' => 'text-blue-400',    'label' => 'PayPal'],
+        'fedapay'       => ['icon' => 'fas fa-credit-card',  'color' => 'text-indigo-400',  'label' => 'FedaPay'],
+        'freemopay'     => ['icon' => 'fas fa-wallet',       'color' => 'text-green-400',   'label' => 'FreeMoPay'],
+        'kpay'          => ['icon' => 'fas fa-mobile-alt',   'color' => 'text-emerald-400', 'label' => 'KPay'],
+        'nexah_sms'     => ['icon' => 'fas fa-sms',          'color' => 'text-purple-400',  'label' => 'Nexah SMS'],
+        'whatsapp'      => ['icon' => 'fab fa-whatsapp',     'color' => 'text-green-400',   'label' => 'WhatsApp Business'],
+        'promo'         => ['icon' => 'fas fa-tag',          'color' => 'text-yellow-400',  'label' => 'Code Promo'],
+        'notifications' => ['icon' => 'fas fa-bell',         'color' => 'text-pink-400',    'label' => 'Notifications'],
+        'security'      => ['icon' => 'fas fa-shield-alt',   'color' => 'text-red-400',     'label' => 'Sécurité'],
+    ];
+    $defaultTab = session('active_tab', $configurations->keys()->first());
+@endphp
 
-    <div class="space-y-6">
+<div x-data="configForm('{{ $defaultTab }}')">
+
+    <!-- Tabs Navigation -->
+    <div class="mb-6 border-b border-dark-200 flex flex-wrap gap-1">
         @foreach($configurations as $group => $configs)
-        <!-- Configuration Group Card -->
-        <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 overflow-hidden">
-            <!-- Group Header -->
-            <div class="bg-dark-50 px-6 py-4 border-b border-dark-200 flex items-center justify-between cursor-pointer"
-                 @click="toggleGroup('{{ $group }}')">
-                <div class="flex items-center">
-                    @if($group === 'general')
-                    <i class="fas fa-cog text-2xl text-primary-400 mr-3"></i>
-                    <h3 class="text-xl font-bold text-white">Général</h3>
-                    @elseif($group === 'maintenance')
-                    <i class="fas fa-tools text-2xl text-orange-400 mr-3"></i>
-                    <h3 class="text-xl font-bold text-white">Maintenance</h3>
-                    @elseif($group === 'system')
-                    <i class="fas fa-server text-2xl text-cyan-400 mr-3"></i>
-                    <h3 class="text-xl font-bold text-white">Système</h3>
-                    @elseif($group === 'paypal')
-                    <i class="fab fa-paypal text-2xl text-blue-400 mr-3"></i>
-                    <h3 class="text-xl font-bold text-white">PayPal</h3>
-                    @elseif($group === 'fedapay')
-                    <i class="fas fa-credit-card text-2xl text-indigo-400 mr-3"></i>
-                    <h3 class="text-xl font-bold text-white">FedaPay</h3>
-                    @elseif($group === 'freemopay')
-                    <i class="fas fa-wallet text-2xl text-green-400 mr-3"></i>
-                    <h3 class="text-xl font-bold text-white">FreeMoPay</h3>
-                    @elseif($group === 'nexah_sms')
-                    <i class="fas fa-sms text-2xl text-purple-400 mr-3"></i>
-                    <h3 class="text-xl font-bold text-white">Nexah SMS</h3>
-                    @elseif($group === 'whatsapp')
-                    <i class="fab fa-whatsapp text-2xl text-green-400 mr-3"></i>
-                    <h3 class="text-xl font-bold text-white">WhatsApp Business</h3>
-                    @elseif($group === 'promo')
-                    <i class="fas fa-tag text-2xl text-yellow-400 mr-3"></i>
-                    <h3 class="text-xl font-bold text-white">Code Promo</h3>
-                    @elseif($group === 'notifications')
-                    <i class="fas fa-bell text-2xl text-pink-400 mr-3"></i>
-                    <h3 class="text-xl font-bold text-white">Notifications</h3>
-                    @elseif($group === 'security')
-                    <i class="fas fa-shield-alt text-2xl text-red-400 mr-3"></i>
-                    <h3 class="text-xl font-bold text-white">Sécurité</h3>
-                    @else
-                    <i class="fas fa-cog text-2xl text-gray-400 mr-3"></i>
-                    <h3 class="text-xl font-bold text-white capitalize">{{ str_replace('_', ' ', $group) }}</h3>
-                    @endif
-                </div>
-                <i class="fas fa-chevron-down text-gray-400 transition-transform"
-                   :class="{ 'rotate-180': openGroups.includes('{{ $group }}') }"></i>
-            </div>
+        @php $meta = $groupMeta[$group] ?? ['icon' => 'fas fa-cog', 'color' => 'text-gray-400', 'label' => ucfirst(str_replace('_', ' ', $group))]; @endphp
+        <button type="button"
+                @click="activeTab = '{{ $group }}'"
+                :class="activeTab === '{{ $group }}' ? 'border-primary-500 text-white bg-dark-100' : 'border-transparent text-gray-400 hover:text-white'"
+                class="px-4 py-3 border-b-2 rounded-t-lg transition flex items-center text-sm font-medium">
+            <i class="{{ $meta['icon'] }} {{ $meta['color'] }} mr-2"></i>
+            {{ $meta['label'] }}
+        </button>
+        @endforeach
+    </div>
 
-            <!-- Group Content -->
-            <div x-show="openGroups.includes('{{ $group }}')"
-                 x-transition
-                 class="p-6">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Tab Panels : un formulaire indépendant par groupe -->
+    @foreach($configurations as $group => $configs)
+    @php $meta = $groupMeta[$group] ?? ['icon' => 'fas fa-cog', 'color' => 'text-gray-400', 'label' => ucfirst(str_replace('_', ' ', $group))]; @endphp
+    <div x-show="activeTab === '{{ $group }}'" x-transition>
+        <form action="{{ route('configuration.updateGroup', $group) }}" method="POST">
+            @csrf
+
+            <!-- Configuration Group Card -->
+            <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 overflow-hidden">
+                <!-- Group Header -->
+                <div class="bg-dark-50 px-6 py-4 border-b border-dark-200 flex items-center">
+                    <i class="{{ $meta['icon'] }} text-2xl {{ $meta['color'] }} mr-3"></i>
+                    <h3 class="text-xl font-bold text-white">{{ $meta['label'] }}</h3>
+                </div>
+
+                <!-- Group Content -->
+                <div class="p-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     @foreach($configs as $config)
                     <div>
                         <label for="config_{{ $config->key }}" class="block text-sm font-medium text-gray-300 mb-2">
@@ -165,26 +159,27 @@
                             <i class="fas fa-exclamation-circle mr-1"></i> {{ $message }}
                         </p>
                         @enderror
+                        </div>
+                        @endforeach
                     </div>
-                    @endforeach
+                </div>
+
+                <!-- Action Buttons (par groupe) -->
+                <div class="bg-dark-50 px-6 py-4 border-t border-dark-200 flex gap-4">
+                    <button type="submit"
+                            class="flex-1 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-lg transition">
+                        <i class="fas fa-save mr-2"></i> Enregistrer « {{ $meta['label'] }} »
+                    </button>
+                    <button type="button"
+                            @click="window.location.reload()"
+                            class="bg-dark-200 hover:bg-dark-300 text-white px-6 py-3 rounded-lg transition">
+                        <i class="fas fa-undo mr-2"></i> Annuler
+                    </button>
                 </div>
             </div>
-        </div>
-        @endforeach
+        </form>
     </div>
-
-    <!-- Action Buttons -->
-    <div class="mt-6 flex gap-4">
-        <button type="submit"
-                class="flex-1 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-lg transition">
-            <i class="fas fa-save mr-2"></i> Enregistrer les modifications
-        </button>
-        <button type="button"
-                @click="window.location.reload()"
-                class="bg-dark-200 hover:bg-dark-300 text-white px-6 py-3 rounded-lg transition">
-            <i class="fas fa-undo mr-2"></i> Annuler
-        </button>
-    </div>
+    @endforeach
 
     <!-- Warning Box -->
     <div class="mt-6 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
@@ -193,25 +188,18 @@
             <div>
                 <p class="text-yellow-300 font-medium mb-1">Attention</p>
                 <p class="text-yellow-200 text-sm">
-                    Assurez-vous de tester vos configurations en mode sandbox avant de passer en production.
-                    Des paramètres incorrects peuvent empêcher les paiements de fonctionner correctement.
+                    Chaque catégorie se sauvegarde indépendamment : enregistrer KPay ne touche pas
+                    aux autres configurations. Testez en mode sandbox avant la production.
                 </p>
             </div>
         </div>
     </div>
-</form>
+</div>
 
 <script>
-function configForm() {
+function configForm(defaultTab) {
     return {
-        openGroups: ['general', 'system', 'paypal', 'fedapay', 'freemopay', 'nexah_sms', 'whatsapp', 'promo', 'notifications', 'security'],
-        toggleGroup(group) {
-            if (this.openGroups.includes(group)) {
-                this.openGroups = this.openGroups.filter(g => g !== group);
-            } else {
-                this.openGroups.push(group);
-            }
-        }
+        activeTab: defaultTab,
     }
 }
 </script>

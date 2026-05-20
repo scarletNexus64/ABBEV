@@ -2,438 +2,315 @@
 
 namespace Database\Seeders;
 
+use App\Models\Category;
+use App\Models\Episode;
+use App\Models\Media;
+use App\Models\Season;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use App\Models\Media;
-use App\Models\Category;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+/**
+ * Seeder de démonstration : 100 films + 50 séries.
+ *
+ * - Les visuels (affiches / bannières) pointent vers le CDN public TMDB
+ *   (image.tmdb.org), aucune clé API requise — voir database/seeders/data/catalog.php.
+ *   En fallback (entrée sans poster TMDB), un SVG local est généré dans
+ *   storage/app/public/{posters,banners}/.
+ * - Toutes les vidéos (films ET épisodes) utilisent la SEULE vidéo longue
+ *   de la library Bunny (~62 min) : c'est la seule assez longue pour être
+ *   réaliste, conformément au choix produit.
+ * - video_provider / video_id / video_library_id / video_metadata sont
+ *   remplis exactement comme le fait MediaController::store(), afin que la
+ *   lecture (iframe Bunny) fonctionne partout dans le dashboard.
+ *
+ * Idempotent : on purge médias/saisons/épisodes de démo avant de réinsérer.
+ */
 class MediaSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
+    use WithoutModelEvents;
+
+    /** GUID de l'unique vidéo Bunny longue (~62 min) utilisée partout. */
+    private const BUNNY_GUID = '0b0553cf-e006-4456-b9c4-92f47daf6b62';
+
+    /** Durée réelle de cette vidéo Bunny, en secondes. */
+    private const BUNNY_LENGTH = 3711;
+
     public function run(): void
     {
-        // Get categories
-        $actionCat = Category::where('slug', 'action')->first();
-        $comedyCat = Category::where('slug', 'comedie')->first();
-        $dramaCat = Category::where('slug', 'drame')->first();
-        $sciFiCat = Category::where('slug', 'science-fiction')->first();
-        $thrillerCat = Category::where('slug', 'thriller')->first();
-        $romanceCat = Category::where('slug', 'romance')->first();
-        $horrorCat = Category::where('slug', 'horreur')->first();
-        $animationCat = Category::where('slug', 'animation')->first();
-        $animeCat = Category::where('slug', 'anime')->first();
+        $catalog = require database_path('seeders/data/catalog.php');
 
-        // Films avec images
-        $films = [
-            [
-                'title' => 'The Dark Knight',
-                'type' => 'movie',
-                'description' => 'Batman affronte le Joker, un criminel anarchiste qui veut plonger Gotham City dans le chaos.',
-                'category_id' => $actionCat?->id,
-                'duration' => 9120, // 2h32
-                'views_count' => rand(10000, 100000),
-                'is_featured' => true,
-                'release_year' => 2008,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/hkBaDkMWbLaf8B1lsWsKX7Ew3Xq.jpg',
-            ],
-            [
-                'title' => 'Inception',
-                'type' => 'movie',
-                'description' => 'Un voleur qui s\'infiltre dans les rêves des gens pour voler leurs secrets se voit confier la mission inverse : implanter une idée.',
-                'category_id' => $sciFiCat?->id,
-                'duration' => 8880, // 2h28
-                'views_count' => rand(10000, 100000),
-                'is_featured' => true,
-                'release_year' => 2010,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/s3TBrRGB1iav7gFOCNx3H31MoES.jpg',
-            ],
-            [
-                'title' => 'Interstellar',
-                'type' => 'movie',
-                'description' => 'Un groupe d\'explorateurs utilise un trou de ver pour voyager au-delà des limites du voyage spatial humain.',
-                'category_id' => $sciFiCat?->id,
-                'duration' => 10140, // 2h49
-                'views_count' => rand(10000, 100000),
-                'is_featured' => true,
-                'release_year' => 2014,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/xu9zaAevzQ5nnrsXN6JcahLnG4i.jpg',
-            ],
-            [
-                'title' => 'Avengers: Endgame',
-                'type' => 'movie',
-                'description' => 'Après les événements dévastateurs, les Avengers s\'assemblent une fois de plus pour inverser les actions de Thanos.',
-                'category_id' => $actionCat?->id,
-                'duration' => 10860, // 3h01
-                'views_count' => rand(10000, 100000),
-                'is_featured' => true,
-                'release_year' => 2019,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/or06FN3Dka5tukK1e9sl16pB3iy.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/or06FN3Dka5tukK1e9sl16pB3iy.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/7RyHsO4yDXtBv1zUU3mTpHeQ0d5.jpg',
-            ],
-            [
-                'title' => 'Parasite',
-                'type' => 'movie',
-                'description' => 'Une famille pauvre s\'infiltre dans la vie d\'une famille riche avec des conséquences inattendues.',
-                'category_id' => $dramaCat?->id,
-                'duration' => 7920, // 2h12
-                'views_count' => rand(10000, 100000),
-                'is_featured' => true,
-                'release_year' => 2019,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/TU9NIjwzjoKPwQHoHshkFcQUCG.jpg',
-            ],
-            [
-                'title' => 'Joker',
-                'type' => 'movie',
-                'description' => 'Dans les années 1980 à Gotham City, un comédien raté sombre dans la folie et devient un tueur psychopathe.',
-                'category_id' => $dramaCat?->id,
-                'duration' => 7320, // 2h02
-                'views_count' => rand(10000, 100000),
-                'is_featured' => true,
-                'release_year' => 2019,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/udDclJoHjfjb8Ekgsd4FDteOkCU.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/udDclJoHjfjb8Ekgsd4FDteOkCU.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/n6bUvigpRFqSwmPp1m2YADdbRBc.jpg',
-            ],
-            [
-                'title' => 'Spider-Man: No Way Home',
-                'type' => 'movie',
-                'description' => 'Peter Parker demande l\'aide du docteur Strange, ce qui ouvre le multiverse et amène des visiteurs d\'autres dimensions.',
-                'category_id' => $actionCat?->id,
-                'duration' => 9000, // 2h30
-                'views_count' => rand(10000, 100000),
-                'is_featured' => false,
-                'release_year' => 2021,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/iQFcwSGbZXMkeyKrxbPnwnRo5fl.jpg',
-            ],
-            [
-                'title' => 'The Shawshank Redemption',
-                'type' => 'movie',
-                'description' => 'Deux hommes emprisonnés nouent une amitié sur plusieurs années, trouvant réconfort et rédemption à travers des actes de décence commune.',
-                'category_id' => $dramaCat?->id,
-                'duration' => 8520, // 2h22
-                'views_count' => rand(10000, 100000),
-                'is_featured' => true,
-                'release_year' => 1994,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/kXfqcdQKsToO0OUXHcrrNCHDBzO.jpg',
-            ],
-            [
-                'title' => 'Pulp Fiction',
-                'type' => 'movie',
-                'description' => 'Les vies de deux tueurs à gages, un boxeur, un gangster et sa femme s\'entrecroisent dans quatre histoires de violence et de rédemption.',
-                'category_id' => $thrillerCat?->id,
-                'duration' => 9240, // 2h34
-                'views_count' => rand(10000, 100000),
-                'is_featured' => false,
-                'release_year' => 1994,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/suaEOtk1N1sgg2MTM7oZd2cfVp3.jpg',
-            ],
-            [
-                'title' => 'Le Parrain',
-                'type' => 'movie',
-                'description' => 'Le patriarche vieillissant d\'une dynastie du crime organisé transfère le contrôle de son empire clandestin à son fils réticent.',
-                'category_id' => $dramaCat?->id,
-                'duration' => 10500, // 2h55
-                'views_count' => rand(10000, 100000),
-                'is_featured' => true,
-                'release_year' => 1972,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/3bhkrj58Vtu7enYsRolD1fZdja1.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/3bhkrj58Vtu7enYsRolD1fZdja1.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/tmU7GeKVybMWFButWEGl2M4GeiP.jpg',
-            ],
-            [
-                'title' => 'Le Roi des Lions',
-                'type' => 'movie',
-                'description' => 'Un jeune lion prince fuit son royaume après la mort tragique de son père, pour finalement découvrir sa véritable destinée et récupérer son trône.',
-                'category_id' => $animationCat?->id,
-                'duration' => 5280, // 1h28
-                'views_count' => rand(10000, 100000),
-                'is_featured' => false,
-                'release_year' => 2019,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/dzBtMocZuJbjLOXvrl4zGYigDzh.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/dzBtMocZuJbjLOXvrl4zGYigDzh.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/1TUg5pO1VZ4B0Q1amk3OlXvlpXV.jpg',
-            ],
-            [
-                'title' => 'La La Land',
-                'type' => 'movie',
-                'description' => 'Une pianiste de jazz et une actrice aspirante tombent amoureux à Los Angeles tout en poursuivant leurs rêves.',
-                'category_id' => $romanceCat?->id,
-                'duration' => 7680, // 2h08
-                'views_count' => rand(10000, 100000),
-                'is_featured' => false,
-                'release_year' => 2016,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/uDO8zWDhfWwoFdKS4fzkUJt0Rf0.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/uDO8zWDhfWwoFdKS4fzkUJt0Rf0.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/fp6X6yhgcxzxCpmM0EZNkJVmSLk.jpg',
-            ],
+        $libraryId = (string) config('services.bunny.library_id');
+
+        // Métadonnées Bunny réelles de la vidéo (snapshot de l'API getVideo).
+        // C'est ce que MediaController stocke dans video_metadata.
+        $bunnyMeta = [
+            'videoLibraryId'       => 664138,
+            'guid'                 => self::BUNNY_GUID,
+            'title'                => 'ABBEV Demo Stream',
+            'length'               => self::BUNNY_LENGTH,
+            'status'               => 4,
+            'framerate'            => 25,
+            'width'                => 640,
+            'height'               => 360,
+            'availableResolutions' => '360p,240p',
+            'thumbnailFileName'    => 'thumbnail.jpg',
+            'hasMP4Fallback'       => true,
         ];
 
-        // Séries avec images
-        $series = [
-            [
-                'title' => 'Breaking Bad',
-                'type' => 'series',
-                'description' => 'Un professeur de chimie au lycée diagnostiqué d\'un cancer en phase terminale s\'associe à un ancien élève pour fabriquer et vendre de la méthamphétamine.',
-                'category_id' => $dramaCat?->id,
-                'duration' => 2880, // 48min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => true,
-                'release_year' => 2008,
-                'seasons' => 5,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/ggFHVNu6YYI5L9pCfOacjizRGt.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg',
-            ],
-            [
-                'title' => 'Stranger Things',
-                'type' => 'series',
-                'description' => 'Quand un jeune garçon disparaît, sa mère, un chef de police et ses amis doivent affronter des forces terrifiantes pour le récupérer.',
-                'category_id' => $sciFiCat?->id,
-                'duration' => 3000, // 50min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => true,
-                'release_year' => 2016,
-                'seasons' => 4,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/49WJfeN0moxb9IPfGn8AIqMGskD.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/49WJfeN0moxb9IPfGn8AIqMGskD.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/56v2KjBlU4XaOv9rVYEQypROD7P.jpg',
-            ],
-            [
-                'title' => 'Game of Thrones',
-                'type' => 'series',
-                'description' => 'Neuf familles nobles se battent pour le contrôle des terres de Westeros, tandis qu\'un ancien ennemi revient après des millénaires de sommeil.',
-                'category_id' => $dramaCat?->id,
-                'duration' => 3600, // 60min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => true,
-                'release_year' => 2011,
-                'seasons' => 8,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/suopoADq0k8YZr4dQXcU6pToj6s.jpg',
-            ],
-            [
-                'title' => 'Money Heist (La Casa de Papel)',
-                'type' => 'series',
-                'description' => 'Un groupe de criminels se rassemble sous la direction d\'un cerveau pour perpétuer le plus grand braquage de l\'histoire de l\'Espagne.',
-                'category_id' => $thrillerCat?->id,
-                'duration' => 4200, // 70min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => true,
-                'release_year' => 2017,
-                'seasons' => 5,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/MoEKaPFHABtA1xKoOteirGaHl1.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/MoEKaPFHABtA1xKoOteirGaHl1.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/piuRhGiQBYWgW668eLTn2hl1Fwm.jpg',
-            ],
-            [
-                'title' => 'Friends',
-                'type' => 'series',
-                'description' => 'Suit la vie personnelle et professionnelle de six amis de 20 et 30 ans vivant à Manhattan.',
-                'category_id' => $comedyCat?->id,
-                'duration' => 1320, // 22min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => true,
-                'release_year' => 1994,
-                'seasons' => 10,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/f496cm9enuEsZkSPzCwnTESEK5s.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/f496cm9enuEsZkSPzCwnTESEK5s.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/l0qVZIpXtIo7km9u5Yqh0nKPOr5.jpg',
-            ],
-            [
-                'title' => 'The Walking Dead',
-                'type' => 'series',
-                'description' => 'Un shérif adjoint se réveille d\'un coma pour découvrir un monde apocalyptique ravagé par des zombies.',
-                'category_id' => $horrorCat?->id,
-                'duration' => 2640, // 44min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => false,
-                'release_year' => 2010,
-                'seasons' => 11,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/xf9wuDcqlUPWABZNeDKPbZUjWx0.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/xf9wuDcqlUPWABZNeDKPbZUjWx0.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/wWJTAKVBHz7NAWbj7hopUW7rLKX.jpg',
-            ],
-            [
-                'title' => 'The Office',
-                'type' => 'series',
-                'description' => 'Un documentaire filmé sur la vie quotidienne des employés d\'un bureau de vente de papier dans une petite ville américaine.',
-                'category_id' => $comedyCat?->id,
-                'duration' => 1320, // 22min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => false,
-                'release_year' => 2005,
-                'seasons' => 9,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/7DJKHzAi83BmQrWLrYYOqcoKfhR.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/7DJKHzAi83BmQrWLrYYOqcoKfhR.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/dEMJgHKRc1SaUjnX8PFmAmIBggj.jpg',
-            ],
-            [
-                'title' => 'The Crown',
-                'type' => 'series',
-                'description' => 'Suit la vie politique de la reine Elizabeth II et les événements qui ont façonné la seconde moitié du 20ème siècle.',
-                'category_id' => $dramaCat?->id,
-                'duration' => 3600, // 60min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => false,
-                'release_year' => 2016,
-                'seasons' => 6,
-                'thumbnail_path' => 'https://image.tmdb.org/t/p/w500/1M876KPjulVwppEpldhdc8V4o68.jpg',
-                'cover_path' => 'https://image.tmdb.org/t/p/w500/1M876KPjulVwppEpldhdc8V4o68.jpg',
-                'banner_path' => 'https://image.tmdb.org/t/p/original/wHJbVsIZuoZnJOCYI2T1J1xcgyC.jpg',
-            ],
+        $filmsCategory  = Category::where('slug', 'films')->firstOrFail();
+        $seriesCategory = Category::where('slug', 'series')->firstOrFail();
+
+        // Map genre-slug -> Category, pour rattacher chaque titre à son genre.
+        $genres = Category::whereIn('slug', collect($catalog['movies'])
+            ->pluck('genre')
+            ->merge(collect($catalog['series'])->pluck('genre'))
+            ->unique()
+            ->all())
+            ->get()
+            ->keyBy('slug');
+
+        $this->purgePreviousDemoData();
+
+        /* ---------------------------------------------------------------
+         |  FILMS — on garde les 100 premiers du catalogue
+         * --------------------------------------------------------------- */
+        $movies = array_slice($catalog['movies'], 0, 100);
+
+        foreach ($movies as $i => $m) {
+            $category = $genres[$m['genre']] ?? $filmsCategory;
+
+            Media::create([
+                'category_id'      => $category->id,
+                'type'             => 'movie',
+                'title'            => $m['title'],
+                'slug'             => $this->uniqueSlug($m['title'], $m['year']),
+                'description'      => $m['desc'],
+                'duration'         => $m['duration'],
+                'release_year'     => $m['year'],
+                'seasons'          => null,
+                'video_path'       => null,
+                'video_provider'   => 'bunny',
+                'video_id'         => self::BUNNY_GUID,
+                'video_library_id' => $libraryId,
+                'video_metadata'   => $bunnyMeta,
+                'thumbnail_path'   => $this->poster($m['title'], $m['genre'], $m['poster'] ?? null),
+                'cover_path'       => $this->poster($m['title'], $m['genre'], $m['poster'] ?? null),
+                'banner_path'      => $this->banner($m['title'], $m['genre'], $m['backdrop'] ?? null),
+                'published_at'     => now()->subDays(rand(1, 720)),
+                'is_featured'      => $i < 8, // les 8 premiers à la une
+                'views_count'      => rand(120, 95000),
+            ]);
+        }
+
+        /* ---------------------------------------------------------------
+         |  SÉRIES — chaque série a ses saisons + épisodes
+         * --------------------------------------------------------------- */
+        $seriesList = array_slice($catalog['series'], 0, 50);
+
+        // Nombre fixe d'épisodes par saison (demande client).
+        $episodesPerSeason = 12;
+
+        foreach ($seriesList as $i => $s) {
+            $category    = $genres[$s['genre']] ?? $seriesCategory;
+            $seasonCount = count($s['seasons']); // on garde le nb de saisons défini
+
+            $media = Media::create([
+                'category_id'      => $category->id,
+                'type'             => 'series',
+                'title'            => $s['title'],
+                'slug'             => $this->uniqueSlug($s['title'], $s['year']),
+                'description'      => $s['desc'],
+                'duration'         => null,
+                'release_year'     => $s['year'],
+                'seasons'          => $seasonCount,
+                'video_path'       => null,
+                // Une série n'a pas de vidéo directe : ses épisodes la portent.
+                'video_provider'   => null,
+                'video_id'         => null,
+                'video_library_id' => null,
+                'video_metadata'   => null,
+                'thumbnail_path'   => $this->poster($s['title'], $s['genre'], $s['poster'] ?? null),
+                'cover_path'       => $this->poster($s['title'], $s['genre'], $s['poster'] ?? null),
+                'banner_path'      => $this->banner($s['title'], $s['genre'], $s['backdrop'] ?? null),
+                'published_at'     => now()->subDays(rand(1, 720)),
+                'is_featured'      => $i < 6,
+                'views_count'      => rand(500, 180000),
+            ]);
+
+            for ($seasonNumber = 1; $seasonNumber <= $seasonCount; $seasonNumber++) {
+                $season = Season::create([
+                    'media_id'       => $media->id,
+                    'season_number'  => $seasonNumber,
+                    'title'          => "Saison {$seasonNumber}",
+                    'description'    => "Saison {$seasonNumber} de « {$s['title']} ».",
+                    'thumbnail_path' => $this->banner($s['title'], $s['genre'], $s['backdrop'] ?? null),
+                    'release_year'   => $s['year'] + ($seasonNumber - 1),
+                    'episodes_count' => $episodesPerSeason,
+                ]);
+
+                for ($ep = 1; $ep <= $episodesPerSeason; $ep++) {
+                    Episode::create([
+                        'season_id'        => $season->id,
+                        'episode_number'   => $ep,
+                        'title'            => "Épisode {$ep}",
+                        'description'      => "Saison {$seasonNumber}, épisode {$ep} de « {$s['title']} ».",
+                        'duration'         => self::BUNNY_LENGTH,
+                        'video_path'       => 'bunny://' . self::BUNNY_GUID,
+                        'video_provider'   => 'bunny',
+                        'video_id'         => self::BUNNY_GUID,
+                        'video_library_id' => $libraryId,
+                        'video_metadata'   => $bunnyMeta,
+                        'thumbnail_path'   => $this->banner($s['title'], $s['genre'], $s['backdrop'] ?? null),
+                        'published_at'     => now()->subDays(rand(1, 600)),
+                        'views_count'      => rand(50, 40000),
+                    ]);
+                }
+            }
+        }
+
+        $this->command?->info(sprintf(
+            'Seed terminé : %d films, %d séries (%d saisons, %d épisodes).',
+            count($movies),
+            count($seriesList),
+            Season::count(),
+            Episode::count(),
+        ));
+    }
+
+    /**
+     * Supprime les données de démo existantes pour rendre le seed rejouable.
+     * Les épisodes/saisons partent en cascade via les FK.
+     */
+    private function purgePreviousDemoData(): void
+    {
+        Episode::query()->delete();
+        Season::query()->delete();
+        Media::query()->delete();
+    }
+
+    private function uniqueSlug(string $title, int $year): string
+    {
+        $base = Str::slug($title . '-' . $year);
+        $slug = $base;
+        $n    = 1;
+
+        while (Media::where('slug', $slug)->exists()) {
+            $slug = $base . '-' . (++$n);
+        }
+
+        return $slug;
+    }
+
+    /**
+     * Palette de couleurs (fond / accent) par genre — pour des affiches
+     * lisibles et cohérentes visuellement.
+     *
+     * @return array{0:string,1:string}
+     */
+    private function palette(string $genre): array
+    {
+        $map = [
+            'action'          => ['0b1d3a', 'ff4d4d'],
+            'aventure'        => ['1b3a1b', 'ffcc33'],
+            'comedie'         => ['3a2e0b', 'ffd23f'],
+            'drame'           => ['2a2a2a', 'e0e0e0'],
+            'horreur'         => ['1a0000', 'b30000'],
+            'science-fiction' => ['001a33', '00d4ff'],
+            'romance'         => ['3a0b22', 'ff6f9c'],
+            'thriller'        => ['12121a', 'ff8c1a'],
+            'documentaire'    => ['10261f', '2ecc71'],
+            'animation'       => ['1a0b3a', 'b14dff'],
+            'anime'           => ['2a0b3a', 'ff4dd2'],
+            'crime'           => ['1a1a1a', 'c0392b'],
+            'fantastique'     => ['0b1a3a', '6f8cff'],
+            'guerre'          => ['262616', '8a7f3f'],
+            'historique'      => ['2a1a0b', 'd4a017'],
+            'musical'         => ['2a0b2a', 'ff5fd2'],
+            'mystere'         => ['0b0b1a', '7f8cff'],
+            'western'         => ['2a1605', 'd98032'],
+            'biographie'      => ['0b1f2a', '3fb6c6'],
+            'sport'           => ['072a16', '2ecc71'],
         ];
 
-        // Anime/Manga
-        $anime = [
-            [
-                'title' => 'Attack on Titan',
-                'type' => 'series',
-                'description' => 'Dans un monde où l\'humanité vit enfermée derrière d\'énormes murs pour se protéger de titans mangeurs d\'hommes, un jeune garçon jure de les exterminer tous.',
-                'category_id' => $animeCat?->id,
-                'duration' => 1440, // 24min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => true,
-                'release_year' => 2013,
-                'seasons' => 4,
-                'thumbnail_path' => 'https://cdn.myanimelist.net/images/anime/10/47347.jpg',
-                'cover_path' => 'https://cdn.myanimelist.net/images/anime/10/47347.jpg',
-                'banner_path' => 'https://cdn.myanimelist.net/images/anime/1988/141762.jpg',
-            ],
-            [
-                'title' => 'One Piece',
-                'type' => 'series',
-                'description' => 'Monkey D. Luffy et son équipage de pirates recherchent le trésor ultime connu sous le nom de "One Piece" afin que Luffy devienne le roi des pirates.',
-                'category_id' => $animeCat?->id,
-                'duration' => 1440, // 24min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => true,
-                'release_year' => 1999,
-                'seasons' => 21,
-                'thumbnail_path' => 'https://cdn.myanimelist.net/images/anime/6/73245.jpg',
-                'cover_path' => 'https://cdn.myanimelist.net/images/anime/6/73245.jpg',
-                'banner_path' => 'https://cdn.myanimelist.net/images/anime/1244/138851.jpg',
-            ],
-            [
-                'title' => 'Demon Slayer',
-                'type' => 'series',
-                'description' => 'Un jeune garçon devient un tueur de démons après que sa famille a été massacrée et sa petite sœur transformée en démon.',
-                'category_id' => $animeCat?->id,
-                'duration' => 1440, // 24min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => true,
-                'release_year' => 2019,
-                'seasons' => 3,
-                'thumbnail_path' => 'https://cdn.myanimelist.net/images/anime/1286/99889.jpg',
-                'cover_path' => 'https://cdn.myanimelist.net/images/anime/1286/99889.jpg',
-                'banner_path' => 'https://cdn.myanimelist.net/images/anime/1764/106555.jpg',
-            ],
-            [
-                'title' => 'Naruto',
-                'type' => 'series',
-                'description' => 'Naruto Uzumaki, un jeune ninja qui rêve de devenir le chef de son village, se lance dans une quête d\'acceptation et de reconnaissance.',
-                'category_id' => $animeCat?->id,
-                'duration' => 1440, // 24min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => true,
-                'release_year' => 2002,
-                'seasons' => 9,
-                'thumbnail_path' => 'https://cdn.myanimelist.net/images/anime/13/17405.jpg',
-                'cover_path' => 'https://cdn.myanimelist.net/images/anime/13/17405.jpg',
-                'banner_path' => 'https://cdn.myanimelist.net/images/anime/1565/111305.jpg',
-            ],
-            [
-                'title' => 'My Hero Academia',
-                'type' => 'series',
-                'description' => 'Dans un monde où presque tout le monde possède des super-pouvoirs, un garçon sans pouvoir rêve de devenir le plus grand héros.',
-                'category_id' => $animeCat?->id,
-                'duration' => 1440, // 24min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => true,
-                'release_year' => 2016,
-                'seasons' => 6,
-                'thumbnail_path' => 'https://cdn.myanimelist.net/images/anime/10/78745.jpg',
-                'cover_path' => 'https://cdn.myanimelist.net/images/anime/10/78745.jpg',
-                'banner_path' => 'https://cdn.myanimelist.net/images/anime/1546/122599.jpg',
-            ],
-            [
-                'title' => 'Death Note',
-                'type' => 'series',
-                'description' => 'Un lycéen trouve un cahier surnaturel qui lui permet de tuer quiconque en écrivant son nom dedans, et décide de créer un monde sans crime.',
-                'category_id' => $animeCat?->id,
-                'duration' => 1440, // 24min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => true,
-                'release_year' => 2006,
-                'seasons' => 1,
-                'thumbnail_path' => 'https://cdn.myanimelist.net/images/anime/9/9453.jpg',
-                'cover_path' => 'https://cdn.myanimelist.net/images/anime/9/9453.jpg',
-                'banner_path' => 'https://cdn.myanimelist.net/images/anime/1079/138100.jpg',
-            ],
-            [
-                'title' => 'Jujutsu Kaisen',
-                'type' => 'series',
-                'description' => 'Un lycéen rejoint une organisation secrète de sorciers pour tuer une malédiction puissante.',
-                'category_id' => $animeCat?->id,
-                'duration' => 1440, // 24min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => true,
-                'release_year' => 2020,
-                'seasons' => 2,
-                'thumbnail_path' => 'https://cdn.myanimelist.net/images/anime/1171/109222.jpg',
-                'cover_path' => 'https://cdn.myanimelist.net/images/anime/1171/109222.jpg',
-                'banner_path' => 'https://cdn.myanimelist.net/images/anime/1792/138653.jpg',
-            ],
-            [
-                'title' => 'Fullmetal Alchemist: Brotherhood',
-                'type' => 'series',
-                'description' => 'Deux frères utilisent l\'alchimie interdite dans une tentative de ramener leur mère à la vie, avec des conséquences dévastatrices.',
-                'category_id' => $animeCat?->id,
-                'duration' => 1440, // 24min par épisode
-                'views_count' => rand(50000, 200000),
-                'is_featured' => true,
-                'release_year' => 2009,
-                'seasons' => 1,
-                'thumbnail_path' => 'https://cdn.myanimelist.net/images/anime/1223/96541.jpg',
-                'cover_path' => 'https://cdn.myanimelist.net/images/anime/1223/96541.jpg',
-                'banner_path' => 'https://cdn.myanimelist.net/images/anime/1208/94745.jpg',
-            ],
-        ];
+        return $map[$genre] ?? ['1a1a2e', 'e94560'];
+    }
 
-        // Insert films
-        foreach ($films as $film) {
-            $film['slug'] = Str::slug($film['title']);
-            Media::create($film);
+    /**
+     * Affiche verticale (2:3).
+     * Priorité : URL TMDB (image.tmdb.org/t/p/w500{poster}) si dispo dans le
+     * catalogue. Sinon, fallback SVG local pour ne jamais avoir d'image cassée.
+     */
+    private function poster(string $title, string $genre, ?string $tmdbPath = null): string
+    {
+        if ($tmdbPath) {
+            return 'https://image.tmdb.org/t/p/w500' . $tmdbPath;
         }
 
-        // Insert series
-        foreach ($series as $serie) {
-            $serie['slug'] = Str::slug($serie['title']);
-            Media::create($serie);
+        return $this->generateSvg($title, $genre, 500, 750, 'posters');
+    }
+
+    /**
+     * Bannière horizontale (16:9).
+     * Priorité : URL TMDB (image.tmdb.org/t/p/w1280{backdrop}). Sinon fallback SVG.
+     */
+    private function banner(string $title, string $genre, ?string $tmdbPath = null): string
+    {
+        if ($tmdbPath) {
+            return 'https://image.tmdb.org/t/p/w1280' . $tmdbPath;
         }
 
-        // Insert anime
-        foreach ($anime as $item) {
-            $item['slug'] = Str::slug($item['title']);
-            Media::create($item);
+        return $this->generateSvg($title, $genre, 1280, 720, 'banners');
+    }
+
+    /**
+     * Génère un fichier SVG sur disk public et retourne son chemin relatif
+     * (compatible avec asset('storage/...')). Réutilise le fichier s'il existe.
+     */
+    private function generateSvg(string $title, string $genre, int $w, int $h, string $folder): string
+    {
+        [$bg, $fg] = $this->palette($genre);
+        $label     = $this->labelFor($title);
+        $slug      = Str::slug($title) ?: 'untitled';
+        $path      = "{$folder}/{$slug}-{$w}x{$h}.svg";
+
+        $disk = Storage::disk('public');
+        if (! $disk->exists($path)) {
+            $fontSize  = (int) round(min($w, $h) / max(8, mb_strlen($label) / 2));
+            $fontSize  = max(28, min($fontSize, 72));
+            $safeLabel = htmlspecialchars($label, ENT_XML1, 'UTF-8');
+
+            $svg = <<<SVG
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {$w} {$h}" width="{$w}" height="{$h}">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#{$bg}"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#g)"/>
+  <text x="50%" y="50%" font-family="Helvetica, Arial, sans-serif" font-weight="700"
+        font-size="{$fontSize}" fill="#{$fg}" text-anchor="middle" dominant-baseline="middle">{$safeLabel}</text>
+</svg>
+SVG;
+            $disk->put($path, $svg);
         }
+
+        return $path;
+    }
+
+    /**
+     * Label lisible pour le visuel — accents aplatis, ponctuation enlevée.
+     */
+    private function labelFor(string $title): string
+    {
+        $clean = Str::ascii($title);
+        $clean = preg_replace('/[^A-Za-z0-9 ]/', '', $clean);
+        $clean = trim(preg_replace('/\s+/', ' ', $clean));
+
+        return $clean;
     }
 }

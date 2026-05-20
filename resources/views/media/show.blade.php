@@ -48,11 +48,11 @@
                         {{ gmdate('H:i:s', $medium->duration) }}
                     </span>
                 @endif
-                @if($medium->seasons)
+                @if($medium->type === 'series')
                     <span>•</span>
                     <span class="flex items-center gap-2">
                         <i class="fas fa-list text-primary-400"></i>
-                        {{ $medium->seasons }} {{ $medium->seasons > 1 ? 'Saisons' : 'Saison' }}
+                        {{ $seasons->count() }} {{ $seasons->count() > 1 ? 'Saisons' : 'Saison' }}
                     </span>
                 @endif
                 <span>•</span>
@@ -69,33 +69,173 @@
         <!-- Main Content -->
         <div class="lg:col-span-2 space-y-6">
             <!-- Video Player -->
-            @if($medium->video_path)
+            @php $bunnyEmbed = $medium->bunnyEmbedUrl(); @endphp
+            @if($bunnyEmbed && $medium->type === 'movie')
             <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 overflow-hidden">
                 <div class="aspect-video bg-black">
-                    @if(str_starts_with($medium->video_path, 'http'))
-                        <div class="w-full h-full flex items-center justify-center text-white">
-                            <div class="text-center">
-                                <i class="fas fa-video text-6xl mb-4 text-primary-400"></i>
-                                <p class="text-xl">Vidéo disponible en ligne</p>
-                                <a href="{{ $medium->video_path }}" target="_blank"
-                                   class="inline-block mt-4 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-lg transition">
-                                    Regarder maintenant
-                                </a>
-                            </div>
-                        </div>
-                    @else
-                        <video controls class="w-full h-full" poster="{{ $medium->thumbnail_path ? asset('storage/' . $medium->thumbnail_path) : '' }}">
-                            <source src="{{ asset('storage/' . $medium->video_path) }}" type="video/mp4">
-                            Votre navigateur ne supporte pas la lecture vidéo.
-                        </video>
-                    @endif
+                    <iframe src="{{ $bunnyEmbed }}"
+                            loading="lazy"
+                            class="w-full h-full border-0"
+                            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+                            allowfullscreen></iframe>
                 </div>
             </div>
-            @else
+            @elseif($medium->type === 'series')
+            @php
+                $libraryId = config('services.bunny.library_id');
+                $firstEpisode = $seasons->flatMap->episodes->first(fn($e) => $e->video_provider === 'bunny' && $e->video_id);
+                $firstEpUrl = $firstEpisode && $libraryId
+                    ? "https://iframe.mediadelivery.net/embed/{$libraryId}/{$firstEpisode->video_id}"
+                    : null;
+            @endphp
+            <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 overflow-hidden"
+                 x-data="{ playerUrl: @js($firstEpUrl), playingEp: {{ $firstEpisode?->id ?? 'null' }} }">
+                <div class="aspect-video bg-black">
+                    <template x-if="playerUrl">
+                        <iframe :src="playerUrl"
+                                loading="lazy"
+                                class="w-full h-full border-0"
+                                allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+                                allowfullscreen></iframe>
+                    </template>
+                    <template x-if="!playerUrl">
+                        <div class="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                            <i class="fas fa-tv text-6xl mb-3 text-primary-400"></i>
+                            <p class="text-lg">Aucun épisode avec vidéo Bunny.</p>
+                            <p class="text-sm text-gray-500">Ajoute des épisodes pour pouvoir les lire ici.</p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            @endif
+
+            @if($medium->type === 'series')
+            <!-- Saisons & Épisodes -->
+            <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+                        <i class="fas fa-list-ol text-primary-400"></i>
+                        Saisons & Épisodes
+                    </h2>
+                    <a href="{{ route('episodes.index', $medium) }}"
+                       class="text-primary-400 hover:text-primary-300 text-sm">
+                        <i class="fas fa-cog mr-1"></i> Gérer
+                    </a>
+                </div>
+
+                @if($seasons->count() > 0)
+                <div x-data="{ activeSeason: {{ $seasons->first()->id }} }" class="space-y-4">
+                    <!-- Tabs Saisons -->
+                    <div class="flex flex-wrap gap-2 border-b border-dark-200 pb-3">
+                        @foreach($seasons as $season)
+                            <button type="button"
+                                    @click="activeSeason = {{ $season->id }}"
+                                    :class="activeSeason === {{ $season->id }} ? 'bg-primary-500 text-white' : 'bg-dark-50 text-gray-400 hover:text-white'"
+                                    class="px-4 py-2 rounded-lg text-sm font-medium transition-all">
+                                S{{ $season->season_number }}@if($season->title) — {{ $season->title }}@endif
+                                <span class="ml-1 text-xs opacity-70">({{ $season->episodes->count() }})</span>
+                            </button>
+                        @endforeach
+                    </div>
+
+                    <!-- Contenu des saisons -->
+                    @foreach($seasons as $season)
+                        <div x-show="activeSeason === {{ $season->id }}" x-cloak class="space-y-2">
+                            @if($season->description)
+                                <p class="text-gray-400 text-sm italic mb-3">{{ $season->description }}</p>
+                            @endif
+
+                            @if($season->episodes->count() > 0)
+                                <div class="space-y-2">
+                                    @foreach($season->episodes as $episode)
+                                        @php
+                                            $epUrl = ($episode->video_provider === 'bunny' && $episode->video_id && $libraryId)
+                                                ? "https://iframe.mediadelivery.net/embed/{$libraryId}/{$episode->video_id}"
+                                                : null;
+                                        @endphp
+                                        <div :class="playingEp === {{ $episode->id }} ? 'border-primary-500 bg-primary-500/10' : 'border-dark-200 bg-dark-50'"
+                                             class="border rounded-lg p-3 transition-all flex items-center gap-3">
+                                            @if($episode->thumbnail_path)
+                                                <img src="{{ str_starts_with($episode->thumbnail_path, 'http') ? $episode->thumbnail_path : asset('storage/'.$episode->thumbnail_path) }}"
+                                                     alt="" class="w-24 h-14 rounded object-cover flex-shrink-0 bg-dark-300">
+                                            @else
+                                                <div class="w-24 h-14 rounded bg-dark-300 flex-shrink-0 flex items-center justify-center text-gray-500">
+                                                    <i class="fas fa-film"></i>
+                                                </div>
+                                            @endif
+
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center gap-2 mb-1">
+                                                    <span class="bg-primary-500 text-white text-xs px-2 py-0.5 rounded">Ep {{ $episode->episode_number }}</span>
+                                                    @if($episode->duration)
+                                                        <span class="text-gray-500 text-xs">
+                                                            <i class="fas fa-clock mr-1"></i>{{ gmdate('H:i:s', $episode->duration) }}
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                                <h4 class="text-white font-medium truncate">{{ $episode->title }}</h4>
+                                                @if($episode->description)
+                                                    <p class="text-gray-400 text-xs line-clamp-1">{{ $episode->description }}</p>
+                                                @endif
+                                            </div>
+
+                                            <div class="flex items-center gap-2">
+                                                @if($epUrl)
+                                                    <button type="button"
+                                                            @click="playerUrl = @js($epUrl); playingEp = {{ $episode->id }}; window.scrollTo({top: 0, behavior: 'smooth'})"
+                                                            class="bg-primary-500 hover:bg-primary-600 text-white px-3 py-2 rounded-lg text-sm">
+                                                        <i class="fas fa-play"></i>
+                                                    </button>
+                                                @else
+                                                    <span class="text-gray-600 text-xs px-3 py-2" title="Pas de vidéo Bunny">
+                                                        <i class="fas fa-video-slash"></i>
+                                                    </span>
+                                                @endif
+                                                <a href="{{ route('episodes.edit', $episode) }}"
+                                                   class="bg-dark-200 hover:bg-dark-300 text-gray-300 hover:text-white px-3 py-2 rounded-lg text-sm"
+                                                   title="Modifier">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="text-center py-8 border border-dashed border-dark-300 rounded-lg">
+                                    <i class="fas fa-video text-gray-600 text-3xl mb-2"></i>
+                                    <p class="text-gray-400 text-sm">Aucun épisode dans cette saison</p>
+                                    <a href="{{ route('episodes.create', $season) }}"
+                                       class="inline-block mt-2 text-primary-400 hover:text-primary-300 text-sm">
+                                        <i class="fas fa-plus mr-1"></i> Ajouter un épisode
+                                    </a>
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+                @else
+                <div class="text-center py-12 border border-dashed border-dark-300 rounded-lg">
+                    <i class="fas fa-film text-gray-600 text-5xl mb-3"></i>
+                    <h3 class="text-white font-semibold mb-1">Aucune saison créée</h3>
+                    <p class="text-gray-400 text-sm mb-4">Cette série n'a pas encore de saisons.</p>
+                    <a href="{{ route('episodes.index', $medium) }}"
+                       class="inline-block bg-gradient-to-r from-primary-500 to-primary-600 hover:shadow-lg text-white px-6 py-2 rounded-lg font-medium">
+                        <i class="fas fa-plus mr-2"></i> Créer la première saison
+                    </a>
+                </div>
+                @endif
+            </div>
+            @endif
+
+            @if($medium->type === 'movie' && !$bunnyEmbed)
             <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-8">
                 <div class="text-center text-gray-400">
                     <i class="fas fa-video-slash text-6xl mb-4"></i>
-                    <p class="text-xl">Aucune vidéo disponible pour ce contenu</p>
+                    <p class="text-xl">Aucune vidéo Bunny attribuée à ce film.</p>
+                    <a href="{{ route('media.edit', $medium) }}"
+                       class="inline-block mt-4 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-lg transition">
+                        Attribuer une vidéo
+                    </a>
                 </div>
             </div>
             @endif
@@ -151,10 +291,14 @@
                     </div>
                     @endif
 
-                    @if($medium->seasons)
+                    @if($medium->type === 'series')
                     <div class="flex justify-between items-start pb-3 border-b border-dark-200">
                         <span class="text-gray-400">Saisons</span>
-                        <span class="text-white font-medium">{{ $medium->seasons }}</span>
+                        <span class="text-white font-medium">{{ $seasons->count() }}</span>
+                    </div>
+                    <div class="flex justify-between items-start pb-3 border-b border-dark-200">
+                        <span class="text-gray-400">Épisodes</span>
+                        <span class="text-white font-medium">{{ $seasons->sum(fn($s) => $s->episodes->count()) }}</span>
                     </div>
                     @endif
 

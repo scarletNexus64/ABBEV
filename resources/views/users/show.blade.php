@@ -4,11 +4,23 @@
 @section('header', 'Détails de l\'utilisateur')
 
 @section('content')
-<!-- Back Button -->
-<div class="mb-6">
+<!-- Back Button + actions -->
+<div class="mb-6 flex items-center justify-between">
     <a href="{{ route('users.index') }}" class="inline-flex items-center text-primary-400 hover:text-primary-300 transition">
         <i class="fas fa-arrow-left mr-2"></i> Retour à la liste
     </a>
+
+    @if($user->id !== auth()->id() && $user->role === 'user')
+    <form action="{{ route('users.destroy', $user) }}" method="POST"
+          onsubmit="return confirm('Supprimer définitivement l\'utilisateur « {{ $user->name }} » ({{ $user->email }}) ?\n\nCette action est irréversible et supprimera toutes ses données associées.');">
+        @csrf
+        @method('DELETE')
+        <button type="submit"
+                class="bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white px-4 py-2 rounded-lg text-sm transition">
+            <i class="fas fa-trash mr-1"></i> Supprimer cet utilisateur
+        </button>
+    </form>
+    @endif
 </div>
 
 <!-- User Info Card -->

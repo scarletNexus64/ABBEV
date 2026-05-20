@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ReconcileKpayTransaction;
 use App\Models\SubscriptionPlan;
 use App\Models\Transaction;
 use App\Models\UserSubscription;
 use App\Services\PayPalService;
 use App\Services\FreemopayService;
+use App\Services\KpayService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -17,11 +19,16 @@ class SubscriptionPaymentController extends Controller
 {
     protected PayPalService $paypalService;
     protected FreemopayService $freemopayService;
+    protected KpayService $kpayService;
 
-    public function __construct(PayPalService $paypalService, FreemopayService $freemopayService)
-    {
+    public function __construct(
+        PayPalService $paypalService,
+        FreemopayService $freemopayService,
+        KpayService $kpayService
+    ) {
         $this->paypalService = $paypalService;
         $this->freemopayService = $freemopayService;
+        $this->kpayService = $kpayService;
     }
 
     /**
@@ -32,13 +39,22 @@ class SubscriptionPaymentController extends Controller
     {
         $validated = $request->validate([
             'subscription_plan_id' => 'required|exists:subscription_plans,id',
-            'payment_method' => 'required|in:paypal,freemopay',
-            'phone_number' => 'required_if:payment_method,freemopay|string',
+            'payment_method' => 'required|in:paypal,freemopay,kpay',
+            'phone_number' => 'required_if:payment_method,freemopay|required_if:payment_method,kpay|string',
+            'mobile_operator' => 'required_if:payment_method,kpay|in:MTN_MONEY,ORANGE_MONEY',
         ]);
 
         try {
             $plan = SubscriptionPlan::findOrFail($validated['subscription_plan_id']);
             $user = auth()->user();
+
+            Log::info('[SubscriptionPayment] Initiate payment', [
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'plan_name' => $plan->name,
+                'amount' => $plan->price,
+                'payment_method' => $validated['payment_method'],
+            ]);
 
             // Créer la transaction en pending
             $transaction = Transaction::create([
@@ -58,6 +74,12 @@ class SubscriptionPaymentController extends Controller
                 ],
             ]);
 
+            Log::info('[SubscriptionPayment] Transaction created', [
+                'transaction_id' => $transaction->transaction_id,
+                'user_id' => $user->id,
+                'status' => 'pending',
+            ]);
+
             if ($validated['payment_method'] === 'paypal') {
                 // Initier paiement PayPal
                 $result = $this->paypalService->createOrder([
@@ -69,11 +91,24 @@ class SubscriptionPaymentController extends Controller
 
                 if (!$result['success']) {
                     $transaction->update(['status' => 'failed']);
+
+                    Log::warning('[SubscriptionPayment] PayPal order creation failed', [
+                        'transaction_id' => $transaction->transaction_id,
+                        'user_id' => $user->id,
+                        'reason' => $result['message'] ?? 'unknown',
+                    ]);
+
                     return response()->json([
                         'success' => false,
                         'message' => $result['message'],
                     ], 400);
                 }
+
+                Log::info('[SubscriptionPayment] PayPal order created', [
+                    'transaction_id' => $transaction->transaction_id,
+                    'user_id' => $user->id,
+                    'order_id' => $result['order_id'],
+                ]);
 
                 // Mettre à jour la transaction avec l'order_id PayPal
                 $transaction->update([
@@ -90,6 +125,65 @@ class SubscriptionPaymentController extends Controller
                     'payment_method' => 'paypal',
                     'approval_url' => $result['approval_url'],
                     'order_id' => $result['order_id'],
+                ]);
+
+            } elseif ($validated['payment_method'] === 'kpay') {
+                // Initier paiement KPay (Mobile Money — USSD)
+                $result = $this->kpayService->initPayment([
+                    'amount' => (int) $plan->price,
+                    'paymentMethod' => $validated['mobile_operator'],
+                    'phoneNumber' => $validated['phone_number'],
+                    'externalId' => $transaction->transaction_id,
+                ]);
+
+                if (!$result['success']) {
+                    $transaction->update(['status' => 'failed']);
+
+                    Log::warning('[SubscriptionPayment] KPay init failed', [
+                        'transaction_id' => $transaction->transaction_id,
+                        'user_id' => $user->id,
+                        'reason' => $result['message'] ?? 'unknown',
+                    ]);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => $result['message'] ?? 'Échec de l\'initialisation KPay',
+                    ], 400);
+                }
+
+                $kpayData = $result['data'];
+                // GET /payments/:id attend l'id KPay (pas la référence humaine).
+                // On stocke l'id dans external_reference et on l'expose au mobile
+                // sous la clé "reference" (que le client utilise pour le polling).
+                $kpayId = $kpayData['id'] ?? null;
+                $kpayHumanRef = $kpayData['reference'] ?? null;
+
+                $transaction->update([
+                    'external_reference' => $kpayId,
+                    'metadata' => array_merge($transaction->metadata, [
+                        'kpay_id' => $kpayId,
+                        'kpay_reference' => $kpayHumanRef,
+                        'kpay_operator' => $validated['mobile_operator'],
+                    ]),
+                ]);
+
+                Log::info('[SubscriptionPayment] KPay payment initiated', [
+                    'transaction_id' => $transaction->transaction_id,
+                    'user_id' => $user->id,
+                    'kpay_id' => $kpayId,
+                    'kpay_reference' => $kpayHumanRef,
+                ]);
+
+                ReconcileKpayTransaction::dispatch($transaction->id);
+
+                return response()->json([
+                    'success' => true,
+                    'transaction_id' => $transaction->transaction_id,
+                    'payment_method' => 'kpay',
+                    'reference' => $kpayId,
+                    'kpay_reference' => $kpayHumanRef,
+                    'status' => $kpayData['status'] ?? 'pending',
+                    'message' => 'Veuillez valider le paiement sur votre téléphone',
                 ]);
 
             } else {
@@ -151,17 +245,35 @@ class SubscriptionPaymentController extends Controller
             'order_id' => 'required|string',
         ]);
 
+        Log::info('[SubscriptionPayment] Capture PayPal payment', [
+            'order_id' => $validated['order_id'],
+        ]);
+
         try {
             // Trouver la transaction
             $transaction = Transaction::where('external_reference', $validated['order_id'])
                 ->where('payment_method', 'paypal')
                 ->firstOrFail();
 
+            Log::info('[SubscriptionPayment] Transaction found for capture', [
+                'transaction_id' => $transaction->transaction_id,
+                'user_id' => $transaction->user_id,
+                'order_id' => $validated['order_id'],
+            ]);
+
             // Capturer le paiement
             $result = $this->paypalService->captureOrder($validated['order_id']);
 
             if (!$result['success']) {
                 $transaction->update(['status' => 'failed']);
+
+                Log::warning('[SubscriptionPayment] PayPal capture failed', [
+                    'transaction_id' => $transaction->transaction_id,
+                    'user_id' => $transaction->user_id,
+                    'order_id' => $validated['order_id'],
+                    'reason' => $result['message'] ?? 'unknown',
+                ]);
+
                 return response()->json([
                     'success' => false,
                     'message' => $result['message'],
@@ -172,6 +284,12 @@ class SubscriptionPaymentController extends Controller
             $transaction->update([
                 'status' => 'completed',
                 'completed_at' => now(),
+            ]);
+
+            Log::info('[SubscriptionPayment] Payment completed', [
+                'transaction_id' => $transaction->transaction_id,
+                'user_id' => $transaction->user_id,
+                'amount' => $transaction->amount,
             ]);
 
             // Créer l'abonnement
@@ -276,39 +394,9 @@ class SubscriptionPaymentController extends Controller
      */
     protected function createSubscription(Transaction $transaction)
     {
-        $planId = $transaction->metadata['subscription_plan_id'] ?? null;
-
-        if (!$planId) {
-            Log::error('[SubscriptionPayment] No plan ID in transaction metadata', [
-                'transaction_id' => $transaction->id,
-            ]);
-            return;
-        }
-
-        $plan = SubscriptionPlan::find($planId);
-
-        if (!$plan) {
-            Log::error('[SubscriptionPayment] Plan not found', [
-                'plan_id' => $planId,
-            ]);
-            return;
-        }
-
-        // Créer l'abonnement
-        UserSubscription::create([
-            'user_id' => $transaction->user_id,
-            'subscription_plan_id' => $plan->id,
-            'transaction_id' => $transaction->id,
-            'starts_at' => now(),
-            'expires_at' => now()->addDays($plan->duration_days),
-            'status' => 'active',
-        ]);
-
-        Log::info('[SubscriptionPayment] Subscription created', [
-            'user_id' => $transaction->user_id,
-            'plan_id' => $plan->id,
-            'transaction_id' => $transaction->id,
-        ]);
+        // Provisionnement centralisé : gère souscription ET
+        // renouvellement (cumul des jours), idempotent.
+        UserSubscription::provisionFromTransaction($transaction);
     }
 
     /**
@@ -317,8 +405,6 @@ class SubscriptionPaymentController extends Controller
      */
     public function freemopayWebhook(Request $request)
     {
-        Log::info('[FreeMoPay Webhook] Received', $request->all());
-
         $reference = $request->input('reference');
 
         if (!$reference) {
@@ -330,4 +416,80 @@ class SubscriptionPaymentController extends Controller
 
         return response()->json(['message' => 'Webhook processed']);
     }
+
+    /**
+     * Vérifier le statut d'un paiement KPay
+     * GET /api/subscription-payment/kpay/status/{reference}
+     */
+    public function checkKpayStatus($reference)
+    {
+        try {
+            // Le client envoie normalement l'id KPay (stocké dans
+            // external_reference). En filet de sécurité, on tente aussi
+            // un fallback sur metadata.kpay_reference (ancienne réf humaine).
+            $transaction = Transaction::where('payment_method', 'kpay')
+                ->where(function ($q) use ($reference) {
+                    $q->where('external_reference', $reference)
+                      ->orWhere('metadata->kpay_reference', $reference);
+                })
+                ->first();
+
+            if (!$transaction) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Transaction introuvable',
+                ], 404);
+            }
+
+            // Toujours interroger KPay avec l'id stocké, jamais avec la
+            // chaîne brute reçue (qui peut être une vieille référence humaine).
+            $result = $this->kpayService->getPayment($transaction->external_reference);
+
+            if (!$result['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'] ?? 'Erreur lors de la vérification',
+                ], 400);
+            }
+
+            $kpayStatus = $result['data']['status'] ?? 'PENDING';
+
+            $localStatus = $this->kpayService->reconcileTransaction($transaction, $kpayStatus);
+
+            if ($localStatus === 'completed') {
+                return response()->json([
+                    'success' => true,
+                    'status' => 'completed',
+                    'message' => 'Paiement effectué avec succès',
+                    'transaction_id' => $transaction->transaction_id,
+                ]);
+            }
+
+            if ($localStatus === 'failed') {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'failed',
+                    'message' => 'Le paiement a échoué',
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'status' => 'pending',
+                'message' => 'Paiement en cours de traitement',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('[SubscriptionPayment] Error checking KPay status', [
+                'error' => $e->getMessage(),
+                'reference' => $reference,
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la vérification du statut',
+            ], 500);
+        }
+    }
+
 }

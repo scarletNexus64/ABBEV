@@ -2,22 +2,29 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Episode;
 use App\Models\Media;
 use App\Models\Season;
-use App\Models\Episode;
+use App\Services\BunnyStreamService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
+/**
+ * Gestion des saisons et épisodes d'une série.
+ *
+ * Comme pour les Media (films), la vidéo d'un épisode n'est pas uploadée :
+ * elle est référencée depuis Bunny Stream via bunny_video_id.
+ */
 class EpisodeController extends Controller
 {
-    /**
-     * Afficher la page de gestion des saisons et épisodes d'une série.
-     */
+    public function __construct(protected BunnyStreamService $bunny)
+    {
+    }
+
     public function index(Media $media)
     {
-        // Vérifier que c'est bien une série
-        if (!$media->isSeries()) {
-            return redirect()->route('media.index')->with('error', 'Ce média n\'est pas une série.');
+        if (! $media->isSeries()) {
+            return redirect()->route('media.index')->with('error', "Ce média n'est pas une série.");
         }
 
         $seasons = $media->seasonsRelation()->with('episodes')->get();
@@ -25,140 +32,172 @@ class EpisodeController extends Controller
         return view('episodes.index', compact('media', 'seasons'));
     }
 
-    /**
-     * Créer une nouvelle saison pour une série.
-     */
     public function createSeason(Request $request, Media $media)
     {
         $validated = $request->validate([
             'season_number' => 'required|integer|min:1',
-            'title' => 'nullable|string|max:255',
-            'description' => 'nullable|string',
-            'release_year' => 'nullable|integer|min:1900|max:' . (date('Y') + 5),
+            'title'         => 'nullable|string|max:255',
+            'description'   => 'nullable|string',
+            'release_year'  => 'nullable|integer|min:1900|max:'.(date('Y') + 5),
         ]);
 
         $season = $media->seasonsRelation()->create($validated);
 
-        return redirect()->route('episodes.index', $media)->with('success', "Saison {$season->season_number} créée avec succès !");
+        return redirect()->route('episodes.index', $media)
+            ->with('success', "Saison {$season->season_number} créée.");
     }
 
-    /**
-     * Afficher le formulaire d'ajout d'épisode.
-     */
     public function create(Season $season)
     {
         return view('episodes.create', compact('season'));
     }
 
-    /**
-     * Enregistrer un nouvel épisode.
-     */
     public function store(Request $request, Season $season)
     {
         $validated = $request->validate([
             'episode_number' => 'required|integer|min:1',
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'duration' => 'nullable|integer|min:1',
-            'video_path' => 'required|string', // Le chemin est fourni par FilePond
-            'thumbnail' => 'nullable|image|max:10240',
-            'published_at' => 'nullable|date',
+            'title'          => 'required|string|max:255',
+            'description'    => 'nullable|string',
+            'duration'       => 'nullable|integer|min:1', // minutes
+            'bunny_video_id' => 'required|string|max:128',
+            'thumbnail'      => 'nullable|image|max:10240',
+            'published_at'   => 'nullable|date',
         ]);
 
-        // Upload de la vignette si fournie
-        if ($request->hasFile('thumbnail')) {
-            $validated['thumbnail_path'] = $request->file('thumbnail')->store('thumbnails', 'public');
+        // Vérifier que la vidéo Bunny n'est pas déjà prise
+        if ($this->isBunnyVideoTaken($validated['bunny_video_id'])) {
+            return back()->withInput()->withErrors([
+                'bunny_video_id' => 'Cette vidéo Bunny est déjà attribuée à un autre film ou épisode.',
+            ]);
         }
 
-        $episode = $season->episodes()->create($validated);
+        $payload = $this->buildPayload($validated, $request);
 
-        // Mettre à jour le compteur d'épisodes de la saison
+        $episode = $season->episodes()->create($payload);
         $season->updateEpisodesCount();
 
-        return redirect()->route('episodes.index', $season->media)->with('success', "Épisode {$episode->episode_number} ajouté avec succès !");
+        return redirect()->route('episodes.index', $season->media)
+            ->with('success', "Épisode {$episode->episode_number} ajouté.");
     }
 
-    /**
-     * Afficher le formulaire d'édition d'un épisode.
-     */
     public function edit(Episode $episode)
     {
         $season = $episode->season;
+
         return view('episodes.edit', compact('episode', 'season'));
     }
 
-    /**
-     * Mettre à jour un épisode.
-     */
     public function update(Request $request, Episode $episode)
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'duration' => 'nullable|integer|min:1',
-            'video_path' => 'nullable|string',
-            'thumbnail' => 'nullable|image|max:10240',
-            'published_at' => 'nullable|date',
+            'title'          => 'required|string|max:255',
+            'description'    => 'nullable|string',
+            'duration'       => 'nullable|integer|min:1',
+            'bunny_video_id' => 'required|string|max:128',
+            'thumbnail'      => 'nullable|image|max:10240',
+            'published_at'   => 'nullable|date',
         ]);
 
-        // Upload de la nouvelle vignette si fournie
-        if ($request->hasFile('thumbnail')) {
-            // Supprimer l'ancienne vignette
-            if ($episode->thumbnail_path) {
-                Storage::disk('public')->delete($episode->thumbnail_path);
-            }
-            $validated['thumbnail_path'] = $request->file('thumbnail')->store('thumbnails', 'public');
+        // Vérifier disponibilité si la vidéo a changé
+        if ($validated['bunny_video_id'] !== $episode->video_id
+            && $this->isBunnyVideoTaken($validated['bunny_video_id'])) {
+            return back()->withInput()->withErrors([
+                'bunny_video_id' => 'Cette vidéo Bunny est déjà attribuée ailleurs.',
+            ]);
         }
 
-        $episode->update($validated);
+        $payload = $this->buildPayload($validated, $request);
 
-        return redirect()->route('episodes.index', $episode->season->media)->with('success', "Épisode {$episode->episode_number} mis à jour avec succès !");
+        if ($request->hasFile('thumbnail') && $episode->thumbnail_path) {
+            Storage::disk('public')->delete($episode->thumbnail_path);
+        }
+
+        $episode->update($payload);
+
+        return redirect()->route('episodes.index', $episode->season->media)
+            ->with('success', "Épisode {$episode->episode_number} mis à jour.");
     }
 
-    /**
-     * Supprimer un épisode.
-     */
     public function destroy(Episode $episode)
     {
         $season = $episode->season;
-        $media = $season->media;
+        $media  = $season->media;
 
-        // Supprimer les fichiers associés
-        if ($episode->video_path) {
-            Storage::disk('public')->delete($episode->video_path);
-        }
         if ($episode->thumbnail_path) {
             Storage::disk('public')->delete($episode->thumbnail_path);
         }
 
+        // La vidéo elle-même reste chez Bunny — on ne la supprime PAS
         $episode->delete();
-
-        // Mettre à jour le compteur
         $season->updateEpisodesCount();
 
-        return redirect()->route('episodes.index', $media)->with('success', 'Épisode supprimé avec succès !');
+        return redirect()->route('episodes.index', $media)
+            ->with('success', 'Épisode supprimé. (La vidéo reste disponible côté Bunny.)');
     }
 
-    /**
-     * Supprimer une saison complète avec tous ses épisodes.
-     */
     public function destroySeason(Season $season)
     {
         $media = $season->media;
+        $num   = $season->season_number;
 
-        // Supprimer tous les fichiers vidéos des épisodes
-        foreach ($season->episodes as $episode) {
-            if ($episode->video_path) {
-                Storage::disk('public')->delete($episode->video_path);
-            }
-            if ($episode->thumbnail_path) {
-                Storage::disk('public')->delete($episode->thumbnail_path);
+        foreach ($season->episodes as $ep) {
+            if ($ep->thumbnail_path) {
+                Storage::disk('public')->delete($ep->thumbnail_path);
             }
         }
 
-        $seasonNumber = $season->season_number;
         $season->delete();
 
-        return redirect()->route('episodes.index', $media)->with('success', "Saison {$seasonNumber} supprimée avec succès !");
+        return redirect()->route('episodes.index', $media)
+            ->with('success', "Saison {$num} supprimée.");
+    }
+
+    /* ---------------------------------------------------------------
+     |  Helpers
+     * --------------------------------------------------------------- */
+    protected function buildPayload(array $validated, Request $request): array
+    {
+        $data = $validated;
+
+        $data['video_provider']   = 'bunny';
+        $data['video_id']         = $validated['bunny_video_id'];
+        $data['video_library_id'] = (string) config('services.bunny.library_id');
+
+        if ($request->hasFile('thumbnail')) {
+            $data['thumbnail_path'] = $request->file('thumbnail')->store('thumbnails', 'public');
+        }
+
+        // Conversion durée min → secondes (fallback si Bunny indisponible)
+        if (! empty($data['duration'])) {
+            $data['duration'] = (int) $data['duration'] * 60;
+        }
+
+        // La durée vient de Bunny : c'est la source de vérité (vraie durée du
+        // fichier encodé). On l'applique systématiquement quand on l'obtient.
+        try {
+            if ($this->bunny->isConfigured()) {
+                $bv = $this->bunny->getVideo($validated['bunny_video_id']);
+                $data['video_metadata'] = $bv;
+                if (! empty($bv['length'])) {
+                    $data['duration'] = (int) $bv['length'];
+                }
+            }
+        } catch (\Throwable $e) {
+            // pas bloquant — on garde la durée saisie si présente
+        }
+
+        unset($data['bunny_video_id']);
+
+        return $data;
+    }
+
+    protected function isBunnyVideoTaken(string $guid): bool
+    {
+        $inMedia = Media::where('video_provider', 'bunny')->where('video_id', $guid)->exists();
+        if ($inMedia) {
+            return true;
+        }
+
+        return Episode::where('video_provider', 'bunny')->where('video_id', $guid)->exists();
     }
 }

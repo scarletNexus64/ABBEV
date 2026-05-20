@@ -1,10 +1,10 @@
 <?php
 
 use App\Http\Controllers\Admin\AuthController;
+use App\Http\Controllers\Admin\BunnySyncController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\MediaController;
-use App\Http\Controllers\ChunkUploadController;
 use App\Http\Controllers\EpisodeController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,9 +34,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('categories', CategoryController::class);
     Route::resource('media', MediaController::class);
 
-    // Chunk Upload Routes
-    Route::post('/upload/chunk', [ChunkUploadController::class, 'upload'])->name('upload.chunk');
-    Route::delete('/upload/chunk', [ChunkUploadController::class, 'delete'])->name('upload.delete');
+    // (upload local supprimé — les vidéos viennent de Bunny Stream)
 
     // Episodes Management for Series
     Route::prefix('media/{media}/episodes')->name('episodes.')->group(function () {
@@ -68,6 +66,7 @@ Route::middleware('auth')->group(function () {
 Route::middleware('auth')->prefix('admin')->group(function () {
     Route::get('/users', [App\Http\Controllers\UserController::class, 'index'])->name('users.index');
     Route::get('/users/{user}', [App\Http\Controllers\UserController::class, 'show'])->name('users.show');
+    Route::delete('/users/{user}', [App\Http\Controllers\UserController::class, 'destroy'])->name('users.destroy');
     
     Route::get('/administrators', [App\Http\Controllers\AdminUserController::class, 'index'])->name('administrators.index');
     Route::get('/administrators/create', [App\Http\Controllers\AdminUserController::class, 'create'])->name('administrators.create');
@@ -80,4 +79,12 @@ Route::middleware('auth')->prefix('admin')->group(function () {
     
     Route::get('/configuration', [App\Http\Controllers\ConfigurationController::class, 'index'])->name('configuration.index');
     Route::post('/configuration', [App\Http\Controllers\ConfigurationController::class, 'update'])->name('configuration.update');
+    Route::post('/configuration/{group}', [App\Http\Controllers\ConfigurationController::class, 'updateGroup'])->name('configuration.updateGroup');
+
+    // Bunny Stream (info read-only + picker)
+    Route::prefix('bunny')->name('admin.bunny.')->group(function () {
+        Route::get('/library',             [BunnySyncController::class, 'library'])->name('library');
+        Route::get('/videos/available',    [BunnySyncController::class, 'available'])->name('videos.available');
+        Route::post('/refresh',            [BunnySyncController::class, 'refresh'])->name('refresh');
+    });
 });

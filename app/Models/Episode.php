@@ -14,6 +14,10 @@ class Episode extends Model
         'description',
         'duration',
         'video_path',
+        'video_provider',
+        'video_id',
+        'video_library_id',
+        'video_metadata',
         'thumbnail_path',
         'published_at',
         'views_count',
@@ -21,9 +25,10 @@ class Episode extends Model
 
     protected $casts = [
         'episode_number' => 'integer',
-        'duration' => 'integer',
-        'views_count' => 'integer',
-        'published_at' => 'datetime',
+        'duration'       => 'integer',
+        'views_count'    => 'integer',
+        'published_at'   => 'datetime',
+        'video_metadata' => 'array',
     ];
 
     /**

@@ -107,6 +107,16 @@
                                class="bg-primary-500/20 hover:bg-primary-500 text-primary-400 hover:text-white px-3 py-2 rounded-lg text-sm transition">
                                 <i class="fas fa-eye"></i> Voir
                             </a>
+                            <form action="{{ route('users.destroy', $user) }}" method="POST"
+                                  onsubmit="return confirm('Supprimer définitivement l\'utilisateur « {{ $user->name }} » ({{ $user->email }}) ?\n\nCette action est irréversible.');"
+                                  class="inline">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit"
+                                        class="bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white px-3 py-2 rounded-lg text-sm transition">
+                                    <i class="fas fa-trash"></i> Supprimer
+                                </button>
+                            </form>
                         </div>
                     </td>
                 </tr>

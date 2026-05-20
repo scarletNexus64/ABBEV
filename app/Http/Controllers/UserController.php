@@ -36,4 +36,25 @@ class UserController extends Controller
         $user->load('subscriptions.plan');
         return view('users.show', compact('user'));
     }
+
+    /**
+     * Supprime définitivement un utilisateur (rôle "user" uniquement). Les
+     * administrateurs passent par AdminUserController. Garde-fous : pas
+     * d'auto-suppression, pas de suppression d'admin par cette route.
+     */
+    public function destroy(User $user)
+    {
+        if ($user->id === auth()->id()) {
+            return back()->with('error', 'Vous ne pouvez pas supprimer votre propre compte.');
+        }
+
+        if ($user->role !== 'user') {
+            return back()->with('error', 'Cet utilisateur n\'est pas un membre standard.');
+        }
+
+        $user->delete();
+
+        return redirect()->route('users.index')
+            ->with('success', 'Utilisateur supprimé avec succès.');
+    }
 }

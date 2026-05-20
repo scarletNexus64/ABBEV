@@ -27,4 +27,32 @@ class ConfigurationController extends Controller
 
         return back()->with('success', 'Configuration mise à jour avec succès.');
     }
+
+    /**
+     * Sauvegarder uniquement les paramètres d'un groupe (onglet),
+     * sans toucher aux autres catégories de configuration.
+     */
+    public function updateGroup(Request $request, string $group)
+    {
+        $validated = $request->validate([
+            'configs' => 'required|array',
+            'configs.*' => 'nullable|string',
+        ]);
+
+        // On ne met à jour que les clés appartenant réellement au
+        // groupe ciblé (sécurité : ignore toute clé hors groupe).
+        $allowedKeys = Configuration::where('group', $group)->pluck('key')->all();
+
+        $updated = 0;
+        foreach ($validated['configs'] as $key => $value) {
+            if (in_array($key, $allowedKeys, true)) {
+                Configuration::where('key', $key)->update(['value' => $value]);
+                $updated++;
+            }
+        }
+
+        return back()
+            ->with('success', "Configuration « {$group} » mise à jour ({$updated} paramètre(s)).")
+            ->with('active_tab', $group);
+    }
 }

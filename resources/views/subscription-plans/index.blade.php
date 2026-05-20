@@ -107,7 +107,7 @@
             @endif
 
             <!-- Features -->
-            @if($plan->features)
+            @if(is_array($plan->features) && count($plan->features))
             <div class="mb-6">
                 <ul class="space-y-2">
                     @foreach($plan->features as $feature)
