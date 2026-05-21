@@ -130,6 +130,25 @@ class AuthApiController extends Controller
 
         $email = $data['email'];
 
+        // Comptes de test (review Play Store / App Store) : on enregistre le
+        // code fixe en base sans envoyer d'email, pour que les testeurs
+        // puissent se connecter sans accès à la boîte mail. La vérification
+        // dans verifyOtp() reste réelle (le code doit matcher en base).
+        if ($this->isOtpTestEmail($email)) {
+            EmailVerification::updateOrCreate(
+                ['email' => $email],
+                [
+                    'code' => (string) config('auth.otp_test_code'),
+                    'expires_at' => Carbon::now()->addMinutes(10),
+                    'verified' => false,
+                ]
+            );
+
+            return response()->json([
+                'message' => 'Code envoyé par email',
+            ]);
+        }
+
         // Code à 6 chiffres
         $code = (string) random_int(100000, 999999);
 
@@ -162,6 +181,16 @@ class AuthApiController extends Controller
                 'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
+    }
+
+    /**
+     * Indique si l'email fait partie des comptes de test OTP (review stores).
+     */
+    private function isOtpTestEmail(string $email): bool
+    {
+        $testEmails = config('auth.otp_test_emails', []);
+
+        return in_array(strtolower(trim($email)), $testEmails, true);
     }
 
     /**

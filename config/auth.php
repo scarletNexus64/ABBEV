@@ -114,4 +114,27 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Comptes de test OTP (review Google Play / App Store)
+    |--------------------------------------------------------------------------
+    |
+    | Pour ces adresses email, l'OTP n'est PAS envoyé par email : le code
+    | fixe `otp_test_code` est directement enregistré en base, ce qui permet
+    | aux testeurs (ex. reviewers Play Store) de se connecter sans accès à la
+    | boîte mail. La vérification reste réelle (le code doit correspondre en
+    | base) — ce n'est pas un bypass total, juste un code prévisible.
+    |
+    | Laisser `OTP_TEST_EMAILS` vide désactive le mécanisme. Les emails sont
+    | comparés en minuscules.
+    |
+    */
+
+    'otp_test_emails' => array_filter(array_map(
+        'trim',
+        explode(',', strtolower((string) env('OTP_TEST_EMAILS', '')))
+    )),
+
+    'otp_test_code' => env('OTP_TEST_CODE', '123456'),
+
 ];
