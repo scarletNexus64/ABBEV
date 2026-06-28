@@ -13,6 +13,7 @@ use App\Services\KpayService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -538,6 +539,78 @@ class AuthApiController extends Controller
 
         return response()->json([
             'message' => 'Déconnexion réussie.',
+        ]);
+    }
+
+    /**
+     * Suppression définitive du compte de l'utilisateur courant et de
+     * toutes ses données associées. Exigé par Apple (Guideline 5.1.1(v))
+     * et par les stores en général : tout compte créable doit être
+     * supprimable depuis l'app, sans passer par un service client.
+     *
+     * DELETE /api/v1/auth/me
+     *
+     * On supprime explicitement les données liées plutôt que de se reposer
+     * sur le cascade DB (toutes les FK ne sont pas en onDelete cascade), puis
+     * on révoque tous les tokens et on supprime l'utilisateur. Le tout dans
+     * une transaction : si une étape échoue, rien n'est supprimé.
+     *
+     * Note : les transactions de paiement sont supprimées avec le compte
+     * (la FK transactions.user_id est en onDelete cascade). On les supprime
+     * aussi explicitement pour rester indépendant du moteur de base.
+     */
+    public function deleteAccount(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // Confirmation : l'app envoie le mot "SUPPRIMER" (ou l'email) pour
+        // éviter une suppression accidentelle. Apple autorise une étape de
+        // confirmation tant qu'elle reste dans l'app.
+        $request->validate([
+            'confirm' => 'required|string',
+        ]);
+
+        $confirm = strtoupper(trim($request->input('confirm')));
+        $expected = ['SUPPRIMER', 'DELETE', strtoupper($user->email)];
+
+        if (! in_array($confirm, $expected, true)) {
+            throw ValidationException::withMessages([
+                'confirm' => ['Confirmation invalide. Tapez SUPPRIMER pour confirmer.'],
+            ]);
+        }
+
+        try {
+            DB::transaction(function () use ($user) {
+                // Données de visionnage et personnelles.
+                WatchHistory::where('user_id', $user->id)->delete();
+                $user->listItems()->delete();
+                $user->subscriptions()->delete();
+                Transaction::where('user_id', $user->id)->delete();
+
+                // Codes OTP liés à l'email.
+                EmailVerification::where('email', $user->email)->delete();
+
+                // Révoque tous les tokens de l'utilisateur.
+                $user->tokens()->delete();
+
+                // Suppression du compte.
+                $user->delete();
+            });
+        } catch (\Throwable $e) {
+            Log::error('[AuthApi] Account deletion failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'La suppression du compte a échoué. Veuillez réessayer.',
+            ], 500);
+        }
+
+        Log::info('[AuthApi] Account deleted', ['email' => $user->email]);
+
+        return response()->json([
+            'message' => 'Votre compte et vos données ont été supprimés définitivement.',
         ]);
     }
 }

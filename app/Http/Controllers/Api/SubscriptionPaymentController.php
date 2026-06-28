@@ -704,22 +704,51 @@ class SubscriptionPaymentController extends Controller
     }
 
     /**
-     * Retrouve l'utilisateur lié à un abonnement Apple via une transaction
-     * antérieure portant le même originalTransactionId.
+     * Retrouve l'utilisateur lié à un abonnement Apple lors d'un
+     * renouvellement notifié par le webhook (l'app n'est pas ouverte).
+     *
+     * Apple ne nous donne pas notre user_id : on doit le retrouver à partir
+     * d'une transaction Apple ANTÉRIEURE de cet abonnement. On tente, dans
+     * l'ordre :
+     *   1. l'originalTransactionId (la racine de la chaîne d'abonnement) ;
+     *   2. le transactionId lui-même (renvoi du même achat) ;
+     *   3. l'originalTransactionId stocké dans external_reference du tout
+     *      premier achat (cas où originalTransactionId == transactionId).
+     *
+     * Si aucun ne matche (achat initial jamais vérifié par le backend),
+     * on logge un avertissement explicite : l'utilisateur a payé mais ne
+     * peut être rattaché → à traiter manuellement / via restore côté app.
      */
     protected function resolveAppleUserId(array $payload): ?int
     {
         $originalId = $payload['originalTransactionId'] ?? null;
+        $txId = $payload['transactionId'] ?? null;
 
-        if (!$originalId) {
-            return null;
+        $userId = null;
+
+        if ($originalId) {
+            $userId = Transaction::where('payment_method', 'apple_iap')
+                ->where(function ($q) use ($originalId) {
+                    $q->where('metadata->apple_original_transaction_id', $originalId)
+                      ->orWhere('external_reference', $originalId);
+                })
+                ->value('user_id');
         }
 
-        $prior = Transaction::where('payment_method', 'apple_iap')
-            ->where('metadata->apple_original_transaction_id', $originalId)
-            ->first();
+        if (!$userId && $txId) {
+            $userId = Transaction::where('payment_method', 'apple_iap')
+                ->where('external_reference', $txId)
+                ->value('user_id');
+        }
 
-        return $prior?->user_id;
+        if (!$userId) {
+            Log::warning('[SubscriptionPayment] Apple renewal: user introuvable', [
+                'original_transaction_id' => $originalId,
+                'transaction_id' => $txId,
+            ]);
+        }
+
+        return $userId;
     }
 
     /**

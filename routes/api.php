@@ -33,6 +33,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('auth:sanctum')->group(function () {
             Route::get('/me',         [AuthApiController::class, 'me']);
             Route::patch('/me',       [AuthApiController::class, 'updateMe']);
+            Route::delete('/me',      [AuthApiController::class, 'deleteAccount']);
             Route::post('/logout',    [AuthApiController::class, 'logout']);
             Route::get('/me/stats',   [AuthApiController::class, 'stats']);
             Route::get('/me/subscription', [AuthApiController::class, 'currentSubscription']);

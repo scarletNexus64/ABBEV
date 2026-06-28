@@ -9,3 +9,22 @@ php artisan optimize
 php artisan view:clear
 php artisan config:clear
 php artisan route:cache
+
+-- Config KPAy
+endpoint : https://admin.kpay.site
+API Key KPay : kpay_ac91bacee18916a69f3b73ebcd33236d478893d52fc228c4
+Secret Key KPay : 4bc98871f0700dbd336d86173ef05faa76e1ef7bbf0627ae4c57fe52b5db3842
+
+-- Config Crypto (NOWPayments) : 
+API Key : 65NMPEB-AZK4WC3-GM230BZ-DR2Z08R
+IPN Secret : 0zSD7zQ6du0BQ8LBXRSrWG6p+19wh0Xf
+callback url prod: https://admin.abbev.tv/api/webhooks/nowpayments
+callback url dev: https://nonhedonic-slung-aura.ngrok-free.dev ( ngrok http 8001 )
+
+-- Config Stripe (Carte) SANDBOX
+Clé publishable (pk_test_… / pk_live_…) :  pk_test_51TdwM9HCStNIJK5cIpXZ3uo76pktAQBTqgOb9P8Fbl1sqakz05uMmMgr3UfHNaaervoXNcLUetLcKgIk302bAIrj00OaleRUxE
+Clé secrète (sk_test_… / sk_live_…) : sk_test_51TdwM9HCStNIJK5cn4lNKVnN0I232g6wmRqqIhX2huJQZOahVzAfOoNWnltobnpFsPSlBSgQcpCs1yqIcpneeMzp002YlvQFt7
+
+-- Config PayPal SANDBOX
+Client Secret : ECl-gnbuZQYLO_3hFHPrbH21dWtHKZI0gKTgPq6u5aHznV0lNvkf3rtZqtubHoHs_w4TNzctrBmXD3Li
+Client ID : ATSI6soS_koxo7ekdfPHmcBulCnIpja9GpUPLbaHo4dqjCrifNTt3FHOPQBwaR4a3nXk_c3SoRYTHi0h
