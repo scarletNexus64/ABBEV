@@ -133,6 +133,22 @@
                             $hasFile    = $u->temp_path && is_file($u->temp_path);
                             $localReady = $u->hasLocalCopy();
                             $inProgress = in_array($u->status, ['uploading','transferring','processing'], true);
+
+                            // Statut AFFICHÉ : une vidéo dispo en local n'est jamais « Échec » rouge.
+                            $note = null;
+                            if ($u->status === 'ready') {
+                                $disp = ['Sur Bunny', 'bg-green-500/15 text-green-300 border-green-500/30', 'fa-circle-check'];
+                            } elseif ($localReady && $u->status === 'failed') {
+                                $disp = ['Disponible en local', 'bg-sky-500/15 text-sky-300 border-sky-500/30', 'fa-hard-drive'];
+                                $note = 'Bunny indisponible — relançable quand il revient';
+                            } elseif ($localReady && $u->status === 'queued') {
+                                $disp = ['En local · attente Bunny', 'bg-sky-500/15 text-sky-300 border-sky-500/30', 'fa-hard-drive'];
+                            } elseif ($u->status === 'failed') {
+                                $disp = ['Échec', 'bg-red-500/15 text-red-300 border-red-500/30', 'fa-circle-exclamation'];
+                                $note = $u->error;
+                            } else {
+                                $disp = $meta;
+                            }
                         @endphp
                         <tr data-upload-id="{{ $u->id }}" data-status="{{ $u->status }}" data-title="{{ \Illuminate\Support\Str::lower($u->title) }}"
                             class="hover:bg-dark-200/30 transition-colors">
@@ -155,16 +171,16 @@
                             </td>
 
                             <td class="px-3 py-3" data-cell="status">
-                                <span class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border {{ $meta[1] }}">
-                                    <i class="fas {{ $meta[2] }} text-[10px]"></i>{{ $meta[0] }}
+                                <span class="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border {{ $disp[1] }}">
+                                    <i class="fas {{ $disp[2] }} text-[10px]"></i>{{ $disp[0] }}
                                 </span>
                                 <div data-cell="progress" class="mt-1.5 {{ $inProgress ? '' : 'hidden' }}">
                                     <div class="w-28 bg-dark-300 rounded-full h-1.5 overflow-hidden">
                                         <div class="bg-primary-500 h-1.5 rounded-full transition-all" style="width:{{ $u->progress }}%"></div>
                                     </div>
                                 </div>
-                                @if($u->status === 'failed' && $u->error)
-                                    <p class="text-[11px] text-red-400/80 mt-1 max-w-xs truncate" title="{{ $u->error }}">{{ $u->error }}</p>
+                                @if($note)
+                                    <p class="text-[11px] text-gray-500 mt-1 max-w-xs truncate" title="{{ $note }}">{{ $note }}</p>
                                 @endif
                             </td>
 
@@ -172,21 +188,21 @@
                             <td class="px-3 py-3 text-gray-500 whitespace-nowrap">{{ $u->created_at?->diffForHumans(null, true) }}</td>
 
                             <td class="px-4 py-3" data-cell="actions">
-                                <div class="flex items-center justify-end gap-1.5">
+                                <div class="flex flex-wrap items-center justify-end gap-1.5">
                                     @if($localReady)
                                         <a href="{{ asset('storage/' . $u->local_path) }}" target="_blank" title="Lire en local"
-                                           class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-dark-200 hover:bg-dark-300 text-green-300"><i class="fas fa-play text-xs"></i></a>
+                                           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-dark-200 hover:bg-dark-300 text-green-300 text-xs"><i class="fas fa-play"></i> Lire</a>
                                     @endif
                                     @if($hasFile)
                                         <a href="{{ route('admin.bunny.uploads.download', $u->id) }}" title="Télécharger l'original"
-                                           class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-dark-200 hover:bg-dark-300 text-gray-300"><i class="fas fa-download text-xs"></i></a>
+                                           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-dark-200 hover:bg-dark-300 text-gray-300 text-xs"><i class="fas fa-download"></i> Original</a>
                                     @endif
                                     @if($hasFile && $u->status === 'failed')
                                         <button type="button" data-retry-row="{{ $u->id }}" title="Relancer vers Bunny"
-                                                class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-dark-200 hover:bg-dark-300 text-amber-300"><i class="fas fa-rotate-right text-xs"></i></button>
+                                                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-dark-200 hover:bg-dark-300 text-amber-300 text-xs"><i class="fas fa-rotate-right"></i> Relancer</button>
                                     @endif
                                     <button type="button" data-del-row="{{ $u->id }}" title="Supprimer"
-                                            class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-dark-200 hover:bg-red-500/30 text-red-300"><i class="fas fa-trash text-xs"></i></button>
+                                            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-dark-200 hover:bg-red-500/30 text-red-300 text-xs"><i class="fas fa-trash"></i> Suppr.</button>
                                 </div>
                             </td>
                         </tr>
@@ -257,17 +273,16 @@
     /* ---------- Mise à jour d'une ligne du tableau ---------- */
     function upsertRow(d){
         let row = tableBody.querySelector(`tr[data-upload-id="${d.id}"]`);
-        if(!row){ // nouvel upload (cette session) → on recharge pour le rendu serveur complet
-            if(d.status==='queued' || TERMINAL.includes(d.status)){ scheduleReload(); }
-            return;
-        }
+        if(!row){ scheduleReload(); return; } // nouvel upload → rendu serveur complet
         row.dataset.status = d.status;
+        // Atteinte d'un état terminal (prête / dispo local / échec) → recharge pour
+        // afficher le statut convivial ET les bonnes actions (rendus côté serveur).
+        if(TERMINAL.includes(d.status)){ scheduleReload(); return; }
+        // Sinon : mise à jour live du pill + barre de progression.
         const stCell = row.querySelector('[data-cell="status"]');
         if(stCell){
-            const prog = stCell.querySelector('[data-cell="progress"]');
-            stCell.querySelector('span').outerHTML = pill(d.status);
-            // réinsérer la barre si encore présente
-            const bar = row.querySelector('[data-cell="progress"]') || prog;
+            const span = stCell.querySelector('span'); if(span) span.outerHTML = pill(d.status);
+            const bar = row.querySelector('[data-cell="progress"]');
             if(bar){
                 if(IN_PROGRESS.includes(d.status)){ bar.classList.remove('hidden'); const f=bar.querySelector('div>div'); if(f) f.style.width=(d.progress||0)+'%'; }
                 else bar.classList.add('hidden');
