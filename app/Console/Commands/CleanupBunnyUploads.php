@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\File;
  * Housekeeping des uploads Bunny :
  *   1. Marque "failed" les uploads restés en réception (uploading) sans activité
  *      depuis plus de 6h (onglet abandonné en cours de réception).
- *   2. Supprime les fichiers temporaires orphelins de storage/app/bunny_uploads
+ *   2. Supprime les fichiers vidéo orphelins de storage/app/public/uploads
  *      qui ne sont plus référencés par aucune ligne active (transfert terminé
  *      ou ligne supprimée).
  *
@@ -40,8 +40,9 @@ class CleanupBunnyUploads extends Command
         }
         $this->info("{$stale->count()} upload(s) bloqué(s) marqué(s) en échec.");
 
-        // 2. Fichiers temporaires orphelins.
-        $dir = storage_path('app/bunny_uploads');
+        // 2. Fichiers vidéo orphelins dans storage/app/public/uploads
+        //    (non référencés par un upload encore présent en base).
+        $dir = storage_path('app/public/uploads');
         $removed = 0;
 
         if (File::isDirectory($dir)) {
@@ -54,7 +55,7 @@ class CleanupBunnyUploads extends Command
                 }
             }
         }
-        $this->info("{$removed} fichier(s) temporaire(s) orphelin(s) supprimé(s).");
+        $this->info("{$removed} fichier(s) vidéo orphelin(s) supprimé(s).");
 
         return self::SUCCESS;
     }

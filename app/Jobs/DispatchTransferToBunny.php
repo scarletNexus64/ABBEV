@@ -71,6 +71,13 @@ class DispatchTransferToBunny implements ShouldQueue
             return;
         }
 
+        // Bunny non configuré : on n'essaie pas (la vidéo reste lisible en local).
+        if (! $bunny->isConfigured()) {
+            $upload->markFailed('Bunny non configuré — vidéo conservée en local. Configurez Bunny puis « Relancer ».');
+
+            return;
+        }
+
         // --- Phase 1 : création de la vidéo + PUT du binaire ---
         try {
             if (! $upload->bunny_guid) {
@@ -105,15 +112,14 @@ class DispatchTransferToBunny implements ShouldQueue
             );
 
             // Binaire envoyé → Bunny transcode (asynchrone).
+            // On GARDE le fichier local jusqu'à ce que Bunny soit "prêt" : la vidéo
+            // reste lisible en local sans interruption pendant l'encodage.
             $upload->update([
                 'status'         => 'processing',
                 'progress'       => 0,
                 'bytes_sent'     => $upload->size_bytes,
                 'transferred_at' => now(),
             ]);
-
-            // Nettoyage du fichier temporaire : le binaire est désormais chez Bunny.
-            $this->deleteTempFile($upload);
 
             Cache::forget('bunny.videos.all'); // la library admin verra la nouvelle vidéo
 
@@ -181,6 +187,11 @@ class DispatchTransferToBunny implements ShouldQueue
         $upload->update(['bunny_status' => $status]);
 
         if ($status >= 4 && $status !== 5) { // 4 = finished/ready
+            // Bunny a la vidéo prête : on bascule les médias attachés en local vers
+            // Bunny, puis on supprime le fichier du serveur. Tout en arrière-plan.
+            $this->migrateLocalMediaToBunny($upload);
+            $this->deleteServerFile($upload);
+
             $upload->update([
                 'status'   => 'ready',
                 'progress' => 100,
@@ -221,11 +232,45 @@ class DispatchTransferToBunny implements ShouldQueue
         }
     }
 
-    protected function deleteTempFile(BunnyUpload $upload): void
+    /**
+     * Bascule vers Bunny tout Media/Episode encore attaché à la copie locale de
+     * cet upload (video_provider='local' + video_path = local_path) : il pointera
+     * désormais sur la vidéo Bunny, de façon transparente.
+     */
+    protected function migrateLocalMediaToBunny(BunnyUpload $upload): void
     {
-        if ($upload->temp_path && is_file($upload->temp_path)) {
-            @unlink($upload->temp_path);
+        if (! $upload->local_path || ! $upload->bunny_guid) {
+            return;
         }
-        $upload->update(['temp_path' => null]);
+
+        $toBunny = [
+            'video_provider'   => 'bunny',
+            'video_id'         => $upload->bunny_guid,
+            'video_library_id' => (string) config('services.bunny.library_id'),
+            'video_path'       => null,
+        ];
+
+        \App\Models\Media::query()
+            ->where('video_provider', 'local')
+            ->where('video_path', $upload->local_path)
+            ->update($toBunny);
+
+        \App\Models\Episode::query()
+            ->where('video_provider', 'local')
+            ->where('video_path', $upload->local_path)
+            ->update($toBunny);
+    }
+
+    /**
+     * Supprime le fichier vidéo du serveur (la vidéo vit désormais chez Bunny).
+     */
+    protected function deleteServerFile(BunnyUpload $upload): void
+    {
+        foreach ([$upload->temp_path, $upload->local_path ? public_path('storage/' . $upload->local_path) : null] as $path) {
+            if ($path && is_file($path)) {
+                @unlink($path);
+            }
+        }
+        $upload->update(['temp_path' => null, 'local_path' => null]);
     }
 }

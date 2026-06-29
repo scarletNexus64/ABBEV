@@ -23,14 +23,19 @@ use Pion\Laravel\ChunkUpload\Receiver\FileReceiver;
  *
  * Phase 1 (ici) : réception chunkée du fichier (navigateur → serveur) via
  * pion/laravel-chunk-upload. Une fois le fichier complet assemblé, on le
- * déplace dans storage/app/bunny_uploads et on dispatche le Job de transfert.
+ * déplace dans storage/app/public/uploads et on dispatche le Job de transfert.
  *
  * Phase 2 (Job DispatchTransferToBunny) : transfert autonome serveur → Bunny.
  */
 class BunnyUploadController extends Controller
 {
-    /** Dossier (relatif au disque local) où vit le fichier assemblé en attente de transfert. */
-    private const TEMP_DIR = 'bunny_uploads';
+    /**
+     * Dossier (relatif au disque PUBLIC) où vit le fichier assemblé.
+     * Stocké sur le disque public ⇒ immédiatement lisible en local (fallback
+     * automatique) tant que Bunny n'a pas pris le relais. Un seul fichier, pas
+     * de double copie. Supprimé en arrière-plan une fois la vidéo prête côté Bunny.
+     */
+    private const UPLOAD_DIR = 'uploads';
 
     /** Extensions vidéo acceptées. */
     private const ALLOWED_EXT = ['mp4', 'mkv', 'mov', 'webm', 'avi', 'm4v', 'ts'];
@@ -76,9 +81,8 @@ class BunnyUploadController extends Controller
      */
     public function start(Request $request): JsonResponse
     {
-        if (! $this->bunny->isConfigured()) {
-            return response()->json(['error' => 'Bunny Stream non configuré.'], 422);
-        }
+        // L'upload est autorisé même si Bunny n'est pas configuré : la vidéo est
+        // stockée en local (lisible) et sera transférée vers Bunny plus tard.
 
         $data = $request->validate([
             'filename'   => 'required|string|max:255',
@@ -178,38 +182,6 @@ class BunnyUploadController extends Controller
     }
 
     /**
-     * Publie une copie locale lisible de la vidéo (fallback de test tant que Bunny
-     * est indisponible). Copie l'original vers le disque public ; la vidéo devient
-     * alors sélectionnable dans le picker d'un film/épisode (video_provider='local').
-     */
-    public function useLocal(BunnyUpload $upload): JsonResponse
-    {
-        if ($upload->hasLocalCopy()) {
-            return response()->json($this->present($upload)); // déjà publiée
-        }
-        if (! $upload->temp_path || ! is_file($upload->temp_path)) {
-            return response()->json(['error' => 'Fichier original introuvable : impossible de publier en local.'], 422);
-        }
-
-        $ext  = strtolower(pathinfo($upload->original_filename, PATHINFO_EXTENSION)) ?: 'mp4';
-        $name = $upload->id . '_' . Str::random(8) . '.' . $ext;
-
-        // Copie en streaming (sans charger le fichier en mémoire) vers le disque public.
-        // On garde l'original (temp_path) pour pouvoir relancer vers Bunny plus tard.
-        $relative = 'local-videos/' . $name;
-        $stream   = fopen($upload->temp_path, 'rb');
-        Storage::disk('public')->writeStream($relative, $stream);
-        if (is_resource($stream)) {
-            fclose($stream);
-        }
-
-        $upload->update(['local_path' => $relative]);
-        Cache::forget('bunny.videos.all'); // le picker rafraîchira ses sources
-
-        return response()->json($this->present($upload));
-    }
-
-    /**
      * Relance le transfert vers Bunny d'un upload échoué (après correction de la clé API).
      * Possible uniquement si l'original local est encore présent.
      */
@@ -240,18 +212,19 @@ class BunnyUploadController extends Controller
      * --------------------------------------------------------------- */
 
     /**
-     * Fichier complet assemblé : on le déplace dans un emplacement stable et
-     * on enclenche le transfert autonome vers Bunny.
+     * Fichier complet assemblé : on le déplace sur le disque PUBLIC (lisible
+     * immédiatement en local) et on enclenche le transfert autonome vers Bunny.
+     * Le même fichier sert à la fois au fallback local et au PUT vers Bunny.
      */
     private function finalize(BunnyUpload $upload, UploadedFile $file): JsonResponse
     {
         $ext  = strtolower(pathinfo($upload->original_filename, PATHINFO_EXTENSION)) ?: 'mp4';
         $name = $upload->id . '_' . Str::random(8) . '.' . $ext;
 
-        // Déplacement (et non copie) du fichier fusionné vers storage/app/bunny_uploads
-        // pour ne pas doubler l'espace disque sur un gros fichier.
-        $destDir      = Storage::disk('local')->path(self::TEMP_DIR);
-        $absolutePath = $destDir . DIRECTORY_SEPARATOR . $name;
+        // Déplacement (et non copie) du fichier fusionné vers storage/app/public/uploads.
+        $destDir      = Storage::disk('public')->path(self::UPLOAD_DIR);
+        $relativePath = self::UPLOAD_DIR . '/' . $name;          // pour servir : asset('storage/'.$relativePath)
+        $absolutePath = $destDir . DIRECTORY_SEPARATOR . $name;  // pour le Job (PUT vers Bunny)
 
         if (! is_dir($destDir)) {
             @mkdir($destDir, 0775, true);
@@ -260,11 +233,15 @@ class BunnyUploadController extends Controller
 
         $upload->update([
             'temp_path'      => $absolutePath,
+            'local_path'     => $relativePath,
             'bytes_received' => $upload->size_bytes,
             'progress'       => 100,
             'status'         => 'queued',
             'uploaded_at'    => now(),
         ]);
+
+        // La vidéo est dès maintenant attribuable (local) dans le picker.
+        Cache::forget('bunny.videos.all');
 
         DispatchTransferToBunny::dispatch($upload->id);
 
@@ -295,10 +272,9 @@ class BunnyUploadController extends Controller
             'has_local_file' => $hasLocalFile,
             'download_url'   => $hasLocalFile ? route('admin.bunny.uploads.download', $upload->id) : null,
             'can_retry'      => $hasLocalFile && $upload->status === 'failed',
-            // Fallback local (test sans Bunny)
+            // Disponibilité locale automatique (lisible tant que Bunny n'a pas pris le relais)
             'local_ready'    => $upload->hasLocalCopy(),
             'local_url'      => $upload->hasLocalCopy() ? asset('storage/' . $upload->local_path) : null,
-            'can_use_local'  => $hasLocalFile && ! $upload->hasLocalCopy(),
         ];
     }
 }

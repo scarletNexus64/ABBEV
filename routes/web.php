@@ -96,6 +96,5 @@ Route::middleware('auth')->prefix('admin')->group(function () {
         Route::get('/uploads/{upload}/status',       [BunnyUploadController::class, 'status'])->name('uploads.status');
         Route::get('/uploads/{upload}/download',     [BunnyUploadController::class, 'download'])->name('uploads.download');
         Route::post('/uploads/{upload}/retry',       [BunnyUploadController::class, 'retry'])->name('uploads.retry');
-        Route::post('/uploads/{upload}/use-local',   [BunnyUploadController::class, 'useLocal'])->name('uploads.use-local');
     });
 });

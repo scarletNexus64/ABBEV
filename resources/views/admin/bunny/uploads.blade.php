@@ -18,23 +18,25 @@
         </p>
         <p class="text-gray-500 text-xs mt-2">
             <i class="fas fa-info-circle"></i>
-            Le transfert vers Bunny se poursuit <span class="text-white font-semibold">même si vous fermez l'onglet</span>.
-            Revenez sur cette page pour suivre l'avancement réel. Les vidéos uploadées apparaissent ensuite dans la
-            <a href="{{ route('admin.bunny.library') }}" class="text-primary-400 hover:underline">Bunny Library</a>
-            et sont attribuables à un film ou un épisode.
+            La vidéo est <span class="text-white font-semibold">stockée sur le serveur et lisible immédiatement</span>,
+            même si Bunny est indisponible. En arrière-plan, dès que Bunny est joignable, la vidéo y est transférée
+            puis <span class="text-white font-semibold">supprimée du serveur</span> — le transfert se poursuit même si
+            vous fermez l'onglet. Tu peux uploader <span class="text-white font-semibold">plusieurs vidéos à la fois</span>
+            (ex. 5 épisodes). Les vidéos sont attribuables à un film ou un épisode dès l'upload.
         </p>
     </div>
 
     @unless($configured)
-        <div class="bg-red-500/10 border border-red-500/30 text-red-200 rounded-xl p-4 text-sm">
+        <div class="bg-yellow-500/10 border border-yellow-500/30 text-yellow-200 rounded-xl p-4 text-sm">
             <i class="fas fa-triangle-exclamation mr-2"></i>
             Bunny Stream n'est pas configuré (BUNNY_STREAM_LIBRARY_ID / BUNNY_STREAM_API_KEY /
-            BUNNY_STREAM_CDN_HOSTNAME). L'upload est désactivé.
+            BUNNY_STREAM_CDN_HOSTNAME). Les uploads restent <span class="font-semibold">stockés en local</span> et
+            lisibles ; ils seront transférés vers Bunny une fois configuré (bouton « Relancer »).
         </div>
     @endunless
 
     {{-- Dropzone --}}
-    <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-6 {{ $configured ? '' : 'opacity-50 pointer-events-none' }}">
+    <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-6">
         <div id="bunny-dropzone"
              class="border-2 border-dashed border-dark-200 hover:border-primary-500/60 rounded-xl p-10 text-center transition-all cursor-pointer">
             <i class="fas fa-film text-4xl text-primary-400 mb-3"></i>
@@ -105,8 +107,6 @@
                                 @if($localReady)
                                     <a href="{{ asset('storage/' . $u->local_path) }}" target="_blank" class="text-green-300 hover:underline mr-3"><i class="fas fa-play mr-1"></i>Lire local</a>
                                     <span class="text-green-400"><i class="fas fa-circle-check mr-1"></i>Dispo picker (local)</span>
-                                @elseif($hasFile)
-                                    <button type="button" data-uselocal-row="{{ $u->id }}" class="text-green-300 hover:underline"><i class="fas fa-clapperboard mr-1"></i>Utiliser en local</button>
                                 @endif
                             </td>
                         </tr>
@@ -195,10 +195,6 @@
             actions.push(`<button type="button" data-retry="${d.id}" class="text-yellow-300 hover:underline">
                 <i class="fas fa-rotate-right mr-1"></i>Relancer vers Bunny</button>`);
         }
-        if (d.can_use_local) {
-            actions.push(`<button type="button" data-uselocal="${d.id}" class="text-green-300 hover:underline">
-                <i class="fas fa-clapperboard mr-1"></i>Utiliser en local (test)</button>`);
-        }
         if (d.local_ready) {
             actions.push(`<a href="${d.local_url}" target="_blank" class="text-green-300 hover:underline">
                 <i class="fas fa-play mr-1"></i>Lire en local</a>`);
@@ -215,25 +211,10 @@
             ${actions.length ? '<div class="flex gap-4 mt-2 text-xs">' + actions.join('') + '</div>' : ''}`;
         const retryBtn = el.querySelector('[data-retry]');
         if (retryBtn) retryBtn.addEventListener('click', () => retryUpload(d.id));
-        const localBtn = el.querySelector('[data-uselocal]');
-        if (localBtn) localBtn.addEventListener('click', () => useLocalUpload(d.id, localBtn));
         // On masque seulement les réussites ; les échecs restent (boutons récupérer/relancer).
         if (d.status === 'ready') {
             setTimeout(() => { el.remove(); }, 4000);
         }
-    }
-
-    async function useLocalUpload(id, btn) {
-        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Publication…'; }
-        try {
-            const r = await fetch(`{{ url('admin/bunny/uploads') }}/${id}/use-local`, {
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' },
-            });
-            const d = await r.json();
-            if (!r.ok) { alert(d.error || 'Publication locale impossible.'); return; }
-            renderCard(d);
-        } catch (e) { alert('Erreur réseau lors de la publication locale.'); }
     }
 
     async function retryUpload(id) {
@@ -279,21 +260,25 @@
     }
 
     /* ---------- Resumable.js ---------- */
-    if (CONFIGURED && window.Resumable) {
+    // L'upload fonctionne même si Bunny est indisponible : la vidéo est stockée
+    // sur le serveur (lisible en local) et poussée vers Bunny en arrière-plan.
+    if (window.Resumable) {
         const r = new Resumable({
             target: URL_CHUNK,
             chunkSize: 5 * 1024 * 1024,      // 5 Mo
-            simultaneousUploads: 1,
+            simultaneousUploads: 3,          // chunks en parallèle (débit gros fichiers + multi-upload)
             testChunks: false,
             fileParameterName: 'file',
             maxChunkRetries: 5,
             chunkRetryInterval: 2000,
+            maxFiles: undefined,             // multi-upload illimité (ex. 5 épisodes d'un coup)
             headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' },
             query: (file) => ({ upload_id: file.uploadId }),
         });
 
+        // assignBrowse(node, isDirectory=false, singleFile=false) → sélection multiple permise.
         r.assignDrop(document.getElementById('bunny-dropzone'));
-        r.assignBrowse(document.getElementById('bunny-browse'));
+        r.assignBrowse(document.getElementById('bunny-browse'), false, false);
 
         // On crée la ligne de suivi avant d'uploader, pour récupérer l'upload_id.
         r.on('fileAdded', async (file) => {
@@ -360,9 +345,6 @@
     // Boutons rendus côté serveur dans le tableau.
     document.querySelectorAll('[data-retry-row]').forEach((btn) => {
         btn.addEventListener('click', () => retryUpload(btn.getAttribute('data-retry-row')));
-    });
-    document.querySelectorAll('[data-uselocal-row]').forEach((btn) => {
-        btn.addEventListener('click', () => useLocalUpload(btn.getAttribute('data-uselocal-row'), btn));
     });
 
     loadActive();
