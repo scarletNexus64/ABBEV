@@ -57,7 +57,7 @@
 
                 <div x-show="!selected" class="mt-2 max-h-72 overflow-y-auto bg-dark-50 border border-dark-200 rounded-lg divide-y divide-dark-200">
                     <template x-if="loading"><div class="p-4 text-gray-400 text-sm text-center"><i class="fas fa-spinner fa-spin mr-2"></i>Chargement…</div></template>
-                    <template x-if="!loading && results.length === 0"><div class="p-4 text-gray-500 text-sm text-center">Aucune vidéo libre.</div></template>
+                    <template x-if="!loading && results.length === 0"><div class="p-4 text-gray-500 text-sm text-center">Aucune vidéo libre. <a href="{{ route('admin.bunny.uploads.index') }}" class="text-primary-300 underline">Uploader une vidéo</a>.</div></template>
                     <template x-for="v in results" :key="v.guid">
                         <button type="button" @click="selected = v" class="w-full text-left flex items-center gap-3 p-3 hover:bg-dark-200/50">
                             <img :src="v.thumb" class="w-20 h-12 rounded object-cover bg-dark-300 flex-shrink-0" onerror="this.style.opacity=.2">

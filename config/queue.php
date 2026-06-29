@@ -44,6 +44,22 @@ return [
             'after_commit' => false,
         ],
 
+        /*
+         * Connexion dédiée aux uploads Bunny. Le transfert d'un fichier de
+         * plusieurs Go vers Bunny peut durer bien plus que les 90s par défaut :
+         * un retry_after court ferait redispatcher le Job en double (double PUT).
+         * On met donc une fenêtre très large (2h) sur cette connexion isolée.
+         * Lancer le worker : php artisan queue:work bunny --queue=bunny --timeout=0
+         */
+        'bunny' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'bunny',
+            'retry_after' => (int) env('BUNNY_QUEUE_RETRY_AFTER', 7200),
+            'after_commit' => false,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

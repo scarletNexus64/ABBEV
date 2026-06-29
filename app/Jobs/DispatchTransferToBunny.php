@@ -1,0 +1,231 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Models\BunnyUpload;
+use App\Services\BunnyStreamService;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * Transfère un fichier déjà reçu côté serveur vers la Bunny Library, de façon
+ * autonome (le navigateur peut être fermé). Deux responsabilités séparées dans
+ * le temps :
+ *
+ *   1. Création + PUT du binaire (une seule exécution, longue) :
+ *        createVideo → uploadVideoStream → status = processing.
+ *   2. Polling du transcodage Bunny (pattern « tick », façon
+ *      ReconcileKpayTransaction) : re-dispatch avec délai tant que Bunny n'a
+ *      pas fini d'encoder (status < 4). Aucun worker n'est bloqué pendant l'attente.
+ *
+ * Idempotent :
+ *   - createVideo() n'est appelé que si bunny_guid est vide ⇒ pas de doublon au retry.
+ *   - garde précoce sur les états terminaux (ready/failed).
+ *
+ * Tourne sur la connexion/queue dédiée « bunny » dont le retry_after est très
+ * élevé (cf. config/queue.php) pour ne pas être redispatché en double pendant
+ * un PUT de plusieurs Go.
+ */
+class DispatchTransferToBunny implements ShouldQueue
+{
+    use Queueable;
+
+    /** Délai entre deux ticks de polling du transcodage (secondes). */
+    private const POLL_INTERVAL_SEC = 20;
+
+    /** Pas de borne de durée côté worker : un PUT de plusieurs Go est légitime. */
+    public int $timeout = 0;
+
+    /** Retries sur échec TRANSITOIRE du PUT (timeout/réseau/5xx). Les erreurs 4xx échouent tout de suite. */
+    public int $tries = 3;
+
+    public int $backoff = 30;
+
+    public function __construct(public int $uploadId)
+    {
+        $this->onConnection('bunny');
+        $this->onQueue('bunny');
+    }
+
+    public function handle(BunnyStreamService $bunny): void
+    {
+        $upload = BunnyUpload::find($this->uploadId);
+
+        if (! $upload) {
+            Log::warning('[DispatchTransferToBunny] Upload introuvable', ['upload_id' => $this->uploadId]);
+
+            return;
+        }
+
+        // --- Idempotence : garde précoce sur états terminaux ---
+        if ($upload->isTerminal()) {
+            return;
+        }
+
+        // --- Phase 2 : polling du transcodage (binaire déjà chez Bunny) ---
+        if ($upload->status === 'processing' && $upload->bunny_guid) {
+            $this->pollTranscoding($bunny, $upload);
+
+            return;
+        }
+
+        // --- Phase 1 : création de la vidéo + PUT du binaire ---
+        try {
+            if (! $upload->bunny_guid) {
+                $guid = $bunny->createVideo($upload->title);
+                $upload->update([
+                    'bunny_guid' => $guid,
+                    'status'     => 'transferring',
+                    'progress'   => 0,
+                ]);
+            } elseif ($upload->status === 'queued') {
+                $upload->update(['status' => 'transferring']);
+            }
+
+            if (! $upload->temp_path || ! is_file($upload->temp_path)) {
+                throw new \RuntimeException("Fichier temporaire absent : {$upload->temp_path}");
+            }
+
+            $lastPersist = 0;
+            $bunny->uploadVideoStream(
+                $upload->bunny_guid,
+                $upload->temp_path,
+                function (int $sent, int $total) use ($upload, &$lastPersist) {
+                    $now = time();
+                    if ($now - $lastPersist >= 2) { // throttle : 1 écriture / 2 s max
+                        $lastPersist = $now;
+                        $upload->update([
+                            'bytes_sent' => $sent,
+                            'progress'   => (int) floor($sent / max(1, $total) * 100),
+                        ]);
+                    }
+                }
+            );
+
+            // Binaire envoyé → Bunny transcode (asynchrone).
+            $upload->update([
+                'status'         => 'processing',
+                'progress'       => 0,
+                'bytes_sent'     => $upload->size_bytes,
+                'transferred_at' => now(),
+            ]);
+
+            // Nettoyage du fichier temporaire : le binaire est désormais chez Bunny.
+            $this->deleteTempFile($upload);
+
+            Cache::forget('bunny.videos.all'); // la library admin verra la nouvelle vidéo
+
+            // Enclenche le polling de transcodage (tick séparé, non bloquant).
+            self::dispatch($this->uploadId)->delay(now()->addSeconds(15));
+        } catch (\Throwable $e) {
+            $httpStatus = $this->httpStatusOf($e);
+
+            Log::error('[DispatchTransferToBunny] Transfert échoué', [
+                'upload_id'   => $this->uploadId,
+                'http_status' => $httpStatus,
+                'exception'   => $e->getMessage(),
+            ]);
+
+            // Erreur permanente (auth/clé invalide, requête refusée) → échec immédiat,
+            // inutile de réessayer. On conserve le fichier local (filet de secours).
+            if ($httpStatus !== null && $httpStatus >= 400 && $httpStatus < 500) {
+                $upload->markFailed($this->humanError($httpStatus, $e));
+
+                return;
+            }
+
+            // Erreur transitoire (timeout, réseau, 5xx) → on laisse Laravel retenter (tries).
+            throw $e;
+        }
+    }
+
+    /** Extrait le code HTTP d'une exception client (Laravel Http ou Guzzle), sinon null. */
+    protected function httpStatusOf(\Throwable $e): ?int
+    {
+        if ($e instanceof \Illuminate\Http\Client\RequestException && $e->response) {
+            return $e->response->status();
+        }
+        if ($e instanceof \GuzzleHttp\Exception\RequestException && $e->hasResponse()) {
+            return $e->getResponse()->getStatusCode();
+        }
+
+        return null;
+    }
+
+    /** Message lisible pour l'admin selon le code HTTP renvoyé par Bunny. */
+    protected function humanError(int $httpStatus, \Throwable $e): string
+    {
+        return match ($httpStatus) {
+            401, 403 => "Bunny a refusé l'accès (HTTP {$httpStatus}). Vérifiez BUNNY_STREAM_API_KEY et la library dans le .env.",
+            404      => "Library ou vidéo introuvable côté Bunny (HTTP 404). Vérifiez BUNNY_STREAM_LIBRARY_ID.",
+            default  => "Bunny a refusé la requête (HTTP {$httpStatus}).",
+        };
+    }
+
+    /**
+     * Vérifie une fois le statut d'encodage Bunny ; re-tick tant que non terminé.
+     */
+    protected function pollTranscoding(BunnyStreamService $bunny, BunnyUpload $upload): void
+    {
+        try {
+            $status = $bunny->getVideoStatus($upload->bunny_guid); // 0..5
+        } catch (\Throwable $e) {
+            // Erreur réseau ponctuelle : on re-tente au tick suivant sans échouer le Job.
+            self::dispatch($this->uploadId)->delay(now()->addSeconds(self::POLL_INTERVAL_SEC));
+
+            return;
+        }
+
+        $upload->update(['bunny_status' => $status]);
+
+        if ($status >= 4 && $status !== 5) { // 4 = finished/ready
+            $upload->update([
+                'status'   => 'ready',
+                'progress' => 100,
+                'ready_at' => now(),
+            ]);
+            Cache::forget('bunny.videos.all');
+
+            return;
+        }
+
+        if ($status === 5) { // 5 = erreur d'encodage Bunny
+            $upload->markFailed('Bunny a échoué à encoder la vidéo (status 5).');
+
+            return;
+        }
+
+        // Encodage en cours : estimation grossière + tick suivant.
+        $upload->update([
+            'progress' => match ($status) {
+                0 => 5,
+                1 => 25,
+                2 => 50,
+                3 => 80,
+                default => 90,
+            },
+        ]);
+
+        self::dispatch($this->uploadId)->delay(now()->addSeconds(self::POLL_INTERVAL_SEC));
+    }
+
+    public function failed(\Throwable $e): void
+    {
+        $upload = BunnyUpload::find($this->uploadId);
+
+        if ($upload && ! $upload->isTerminal()) {
+            // On NE supprime PAS temp_path ici : permet un re-dispatch manuel.
+            $upload->markFailed($e->getMessage());
+        }
+    }
+
+    protected function deleteTempFile(BunnyUpload $upload): void
+    {
+        if ($upload->temp_path && is_file($upload->temp_path)) {
+            @unlink($upload->temp_path);
+        }
+        $upload->update(['temp_path' => null]);
+    }
+}

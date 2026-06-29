@@ -84,6 +84,7 @@
             @php
                 $libraryId = config('services.bunny.library_id');
                 $firstEpisode = $seasons->flatMap->episodes->first(fn($e) => $e->video_provider === 'bunny' && $e->video_id);
+                $firstLocalEp = $seasons->flatMap->episodes->first(fn($e) => $e->video_provider === 'local' && $e->video_path);
                 $firstEpUrl = $firstEpisode && $libraryId
                     ? "https://iframe.mediadelivery.net/embed/{$libraryId}/{$firstEpisode->video_id}"
                     : null;
@@ -99,11 +100,16 @@
                                 allowfullscreen></iframe>
                     </template>
                     <template x-if="!playerUrl">
-                        <div class="w-full h-full flex flex-col items-center justify-center text-gray-400">
-                            <i class="fas fa-tv text-6xl mb-3 text-primary-400"></i>
-                            <p class="text-lg">Aucun épisode avec vidéo Bunny.</p>
-                            <p class="text-sm text-gray-500">Ajoute des épisodes pour pouvoir les lire ici.</p>
-                        </div>
+                        @if($firstLocalEp)
+                            <video controls preload="metadata" class="w-full h-full"
+                                   src="{{ asset('storage/' . ltrim($firstLocalEp->video_path, '/')) }}"></video>
+                        @else
+                            <div class="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                                <i class="fas fa-tv text-6xl mb-3 text-primary-400"></i>
+                                <p class="text-lg">Aucun épisode avec vidéo.</p>
+                                <p class="text-sm text-gray-500">Ajoute des épisodes pour pouvoir les lire ici.</p>
+                            </div>
+                        @endif
                     </template>
                 </div>
             </div>
@@ -152,6 +158,9 @@
                                             $epUrl = ($episode->video_provider === 'bunny' && $episode->video_id && $libraryId)
                                                 ? "https://iframe.mediadelivery.net/embed/{$libraryId}/{$episode->video_id}"
                                                 : null;
+                                            $epLocalUrl = ($episode->video_provider === 'local' && $episode->video_path)
+                                                ? asset('storage/' . ltrim($episode->video_path, '/'))
+                                                : null;
                                         @endphp
                                         <div :class="playingEp === {{ $episode->id }} ? 'border-primary-500 bg-primary-500/10' : 'border-dark-200 bg-dark-50'"
                                              class="border rounded-lg p-3 transition-all flex items-center gap-3">
@@ -186,8 +195,14 @@
                                                             class="bg-primary-500 hover:bg-primary-600 text-white px-3 py-2 rounded-lg text-sm">
                                                         <i class="fas fa-play"></i>
                                                     </button>
+                                                @elseif($epLocalUrl)
+                                                    <a href="{{ $epLocalUrl }}" target="_blank"
+                                                       class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm"
+                                                       title="Lire la vidéo locale (test)">
+                                                        <i class="fas fa-play"></i>
+                                                    </a>
                                                 @else
-                                                    <span class="text-gray-600 text-xs px-3 py-2" title="Pas de vidéo Bunny">
+                                                    <span class="text-gray-600 text-xs px-3 py-2" title="Pas de vidéo">
                                                         <i class="fas fa-video-slash"></i>
                                                     </span>
                                                 @endif
@@ -227,11 +242,25 @@
             </div>
             @endif
 
-            @if($medium->type === 'movie' && !$bunnyEmbed)
+            @php $hasLocalMovie = $medium->type === 'movie' && $medium->video_provider === 'local' && $medium->video_path; @endphp
+            @if($hasLocalMovie)
+            <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 overflow-hidden">
+                <div class="aspect-video bg-black">
+                    <video controls preload="metadata" class="w-full h-full"
+                           src="{{ asset('storage/' . ltrim($medium->video_path, '/')) }}"></video>
+                </div>
+                <div class="px-4 py-2 text-xs text-yellow-300/90 bg-yellow-500/5 border-t border-dark-200">
+                    <i class="fas fa-clapperboard mr-1"></i>
+                    Lecture locale (fallback de test) — cette vidéo n'est pas encore sur Bunny.
+                </div>
+            </div>
+            @endif
+
+            @if($medium->type === 'movie' && !$bunnyEmbed && !$hasLocalMovie)
             <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-8">
                 <div class="text-center text-gray-400">
                     <i class="fas fa-video-slash text-6xl mb-4"></i>
-                    <p class="text-xl">Aucune vidéo Bunny attribuée à ce film.</p>
+                    <p class="text-xl">Aucune vidéo attribuée à ce film.</p>
                     <a href="{{ route('media.edit', $medium) }}"
                        class="inline-block mt-4 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-lg transition">
                         Attribuer une vidéo

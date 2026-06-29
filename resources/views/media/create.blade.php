@@ -119,8 +119,8 @@
                             </template>
                             <template x-if="!loading && results.length === 0">
                                 <div class="p-4 text-gray-500 text-sm text-center">
-                                    Aucune vidéo libre. Upload-en sur
-                                    <a href="https://dash.bunny.net/stream/{{ config('services.bunny.library_id') }}/library/overview" target="_blank" class="text-primary-300 underline">Bunny</a>.
+                                    Aucune vidéo libre.
+                                    <a href="{{ route('admin.bunny.uploads.index') }}" class="text-primary-300 underline">Uploader une vidéo</a>.
                                 </div>
                             </template>
                             <template x-for="v in results" :key="v.guid">

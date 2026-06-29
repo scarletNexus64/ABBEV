@@ -27,11 +27,10 @@
                 </p>
             </div>
             <div class="flex gap-3">
-                <a href="https://dash.bunny.net/stream/{{ config('services.bunny.library_id') }}/library/overview"
-                   target="_blank"
-                   class="bg-dark-200 hover:bg-dark-300 text-white px-4 py-2 rounded-lg font-medium transition-all">
-                    <i class="fas fa-external-link-alt mr-2"></i>
-                    Uploader sur Bunny
+                <a href="{{ route('admin.bunny.uploads.index') }}"
+                   class="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg font-medium transition-all">
+                    <i class="fas fa-cloud-arrow-up mr-2"></i>
+                    Uploader une vidéo
                 </a>
                 <form action="{{ route('admin.bunny.refresh') }}" method="POST">
                     @csrf

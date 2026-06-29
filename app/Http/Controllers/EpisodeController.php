@@ -159,9 +159,21 @@ class EpisodeController extends Controller
     {
         $data = $validated;
 
-        $data['video_provider']   = 'bunny';
-        $data['video_id']         = $validated['bunny_video_id'];
-        $data['video_library_id'] = (string) config('services.bunny.library_id');
+        $sel = $validated['bunny_video_id'];
+
+        if (str_starts_with($sel, 'local:')) {
+            // Vidéo locale (fallback de test sans Bunny).
+            $upload = \App\Models\BunnyUpload::find((int) substr($sel, 6));
+            $data['video_provider']   = 'local';
+            $data['video_path']       = $upload?->local_path;
+            $data['video_id']         = null;
+            $data['video_library_id'] = null;
+            $data['video_metadata']   = null;
+        } else {
+            $data['video_provider']   = 'bunny';
+            $data['video_id']         = $sel;
+            $data['video_library_id'] = (string) config('services.bunny.library_id');
+        }
 
         if ($request->hasFile('thumbnail')) {
             $data['thumbnail_path'] = $request->file('thumbnail')->store('thumbnails', 'public');
@@ -174,16 +186,18 @@ class EpisodeController extends Controller
 
         // La durée vient de Bunny : c'est la source de vérité (vraie durée du
         // fichier encodé). On l'applique systématiquement quand on l'obtient.
-        try {
-            if ($this->bunny->isConfigured()) {
-                $bv = $this->bunny->getVideo($validated['bunny_video_id']);
-                $data['video_metadata'] = $bv;
-                if (! empty($bv['length'])) {
-                    $data['duration'] = (int) $bv['length'];
+        if (($data['video_provider'] ?? null) === 'bunny') {
+            try {
+                if ($this->bunny->isConfigured()) {
+                    $bv = $this->bunny->getVideo($sel);
+                    $data['video_metadata'] = $bv;
+                    if (! empty($bv['length'])) {
+                        $data['duration'] = (int) $bv['length'];
+                    }
                 }
+            } catch (\Throwable $e) {
+                // pas bloquant — on garde la durée saisie si présente
             }
-        } catch (\Throwable $e) {
-            // pas bloquant — on garde la durée saisie si présente
         }
 
         unset($data['bunny_video_id']);

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\BunnySyncController;
+use App\Http\Controllers\Admin\BunnyUploadController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\MediaController;
@@ -86,5 +87,15 @@ Route::middleware('auth')->prefix('admin')->group(function () {
         Route::get('/library',             [BunnySyncController::class, 'library'])->name('library');
         Route::get('/videos/available',    [BunnySyncController::class, 'available'])->name('videos.available');
         Route::post('/refresh',            [BunnySyncController::class, 'refresh'])->name('refresh');
+
+        // Upload de vidéos vers la Bunny Library (async, autonome)
+        Route::get('/uploads',                       [BunnyUploadController::class, 'index'])->name('uploads.index');
+        Route::get('/uploads/active',                [BunnyUploadController::class, 'active'])->name('uploads.active');
+        Route::post('/upload/start',                 [BunnyUploadController::class, 'start'])->name('upload.start');
+        Route::match(['get', 'post'], '/upload/chunk', [BunnyUploadController::class, 'chunk'])->name('upload.chunk');
+        Route::get('/uploads/{upload}/status',       [BunnyUploadController::class, 'status'])->name('uploads.status');
+        Route::get('/uploads/{upload}/download',     [BunnyUploadController::class, 'download'])->name('uploads.download');
+        Route::post('/uploads/{upload}/retry',       [BunnyUploadController::class, 'retry'])->name('uploads.retry');
+        Route::post('/uploads/{upload}/use-local',   [BunnyUploadController::class, 'useLocal'])->name('uploads.use-local');
     });
 });

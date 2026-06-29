@@ -104,6 +104,79 @@ class BunnyStreamService
         return $resp->json();
     }
 
+    /**
+     * Statut d'encodage Bunny d'une vidéo.
+     * 0 = created, 1 = uploaded, 2 = processing, 3 = transcoding, 4 = finished/ready, 5 = error.
+     */
+    public function getVideoStatus(string $guid): int
+    {
+        return (int) ($this->getVideo($guid)['status'] ?? 0);
+    }
+
+    /**
+     * Crée une entrée vidéo (sans binaire) dans la library et retourne son guid.
+     * POST /library/{libraryId}/videos {"title": ...}
+     */
+    public function createVideo(string $title): string
+    {
+        $resp = $this->api()->post("/library/{$this->libraryId}/videos", [
+            'title' => $title,
+        ]);
+        $resp->throw();
+
+        return (string) $resp->json('guid');
+    }
+
+    /**
+     * Envoie le binaire d'un fichier vidéo vers une vidéo Bunny existante.
+     *
+     * PUT /library/{libraryId}/videos/{guid} avec le fichier en body.
+     *
+     * Le fichier est streamé via une resource fopen() : cURL lit le handle au
+     * fil de l'eau, donc l'empreinte mémoire reste constante (quelques Mo) même
+     * pour un fichier de plusieurs Go. NE PAS remplacer par file_get_contents()
+     * ni Http::attach() (qui bufferiseraient tout le fichier en RAM).
+     *
+     * @param  callable|null  $onProgress  fn(int $bytesSent, int $bytesTotal)
+     */
+    public function uploadVideoStream(string $guid, string $absolutePath, ?callable $onProgress = null): bool
+    {
+        $stream = @fopen($absolutePath, 'rb');
+        if ($stream === false) {
+            throw new \RuntimeException("Impossible d'ouvrir le fichier : {$absolutePath}");
+        }
+
+        try {
+            $client = new \GuzzleHttp\Client(['http_errors' => true]);
+
+            $response = $client->put(
+                "https://video.bunnycdn.com/library/{$this->libraryId}/videos/{$guid}",
+                [
+                    'headers' => [
+                        'AccessKey'    => $this->apiKey,
+                        'Content-Type' => 'application/octet-stream',
+                        'Accept'       => 'application/json',
+                    ],
+                    'body'            => $stream, // resource ⇒ streamé chunk par chunk
+                    'timeout'         => 0,       // pas de timeout total (gros fichiers)
+                    'connect_timeout' => 30,
+                    'expect'          => false,   // pas de "Expect: 100-continue"
+                    'progress'        => function ($downloadTotal, $downloaded, $uploadTotal, $uploaded) use ($onProgress) {
+                        if ($onProgress && $uploadTotal > 0) {
+                            $onProgress((int) $uploaded, (int) $uploadTotal);
+                        }
+                    },
+                ]
+            );
+
+            return $response->getStatusCode() === 200;
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+    }
+
     public function deleteVideo(string $guid): bool
     {
         $resp = $this->api()->delete("/library/{$this->libraryId}/videos/{$guid}");

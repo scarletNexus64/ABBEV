@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\BunnyUpload;
 use App\Models\Episode;
 use App\Models\Media;
 use App\Services\BunnyStreamService;
@@ -83,47 +84,54 @@ class BunnySyncController extends Controller
      */
     public function available(Request $request): JsonResponse
     {
-        if (! $this->bunny->isConfigured()) {
-            return response()->json(['data' => [], 'error' => 'Bunny non configuré.']);
-        }
-
-        try {
-            $videos = $this->fetchVideosCached();
-        } catch (\Throwable $e) {
-            return response()->json(['data' => [], 'error' => $e->getMessage()]);
-        }
-
-        $usageMap = $this->buildUsageMap();
-        $q        = trim((string) $request->get('q', ''));
+        $q           = trim((string) $request->get('q', ''));
         $includeGuid = $request->get('include'); // pour pré-cocher la vidéo actuelle en édition
+        $usageMap    = $this->buildUsageMap();
+        $error       = null;
 
-        $items = collect($videos)
-            ->filter(function ($v) use ($usageMap, $includeGuid) {
-                $guid = $v['guid'] ?? null;
-                if (! $guid) {
-                    return false;
-                }
-                if ($includeGuid && $guid === $includeGuid) {
-                    return true; // toujours inclure la vidéo en cours d'édition
-                }
-                return ! isset($usageMap[$guid]); // sinon, seulement les libres
-            })
-            ->filter(function ($v) use ($q) {
-                if ($q === '') return true;
-                return stripos($v['title'] ?? '', $q) !== false
-                    || stripos($v['guid'] ?? '', $q) !== false;
-            })
-            ->values()
-            ->map(fn ($v) => [
-                'guid'   => $v['guid'],
-                'title'  => $v['title'] ?? 'Sans titre',
-                'length' => (int) ($v['length'] ?? 0),
-                'thumb'  => $this->bunny->thumbnailUrl($v['guid']),
-                'size'   => (int) ($v['storageSize'] ?? 0),
-                'status' => (int) ($v['status'] ?? 0),
-            ]);
+        // 1. Vidéos Bunny (best-effort : si Bunny échoue, on garde les vidéos locales).
+        $bunnyItems = collect();
+        if ($this->bunny->isConfigured()) {
+            try {
+                $bunnyItems = collect($this->fetchVideosCached())
+                    ->filter(function ($v) use ($usageMap, $includeGuid) {
+                        $guid = $v['guid'] ?? null;
+                        if (! $guid) {
+                            return false;
+                        }
+                        if ($includeGuid && $guid === $includeGuid) {
+                            return true;
+                        }
+                        return ! isset($usageMap[$guid]);
+                    })
+                    ->filter(function ($v) use ($q) {
+                        if ($q === '') return true;
+                        return stripos($v['title'] ?? '', $q) !== false
+                            || stripos($v['guid'] ?? '', $q) !== false;
+                    })
+                    ->values()
+                    ->map(fn ($v) => [
+                        'guid'   => $v['guid'],
+                        'title'  => $v['title'] ?? 'Sans titre',
+                        'length' => (int) ($v['length'] ?? 0),
+                        'thumb'  => $this->bunny->thumbnailUrl($v['guid']),
+                        'size'   => (int) ($v['storageSize'] ?? 0),
+                        'status' => (int) ($v['status'] ?? 0),
+                        'source' => 'bunny',
+                    ]);
+            } catch (\Throwable $e) {
+                $error = 'Bunny indisponible : '.$e->getMessage();
+            }
+        } else {
+            $error = 'Bunny non configuré.';
+        }
 
-        return response()->json(['data' => $items, 'count' => $items->count()]);
+        // 2. Vidéos locales publiées (fallback de test), non encore attribuées.
+        $localItems = $this->availableLocalVideos($usageMap, $q, $includeGuid);
+
+        $items = $localItems->concat($bunnyItems)->values();
+
+        return response()->json(['data' => $items, 'count' => $items->count(), 'error' => $error]);
     }
 
     /**
@@ -146,6 +154,47 @@ class BunnySyncController extends Controller
     protected function fetchVideosCached(int $ttl = 60): array
     {
         return Cache::remember('bunny.videos.all', $ttl, fn () => $this->bunny->listAllVideos());
+    }
+
+    /**
+     * Vidéos locales publiées (fallback de test sans Bunny), non encore attribuées.
+     * Représentées par un guid spécial "local:{id}" interprété par MediaController/EpisodeController.
+     *
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    protected function availableLocalVideos(array $usageMap, string $q, ?string $includeGuid): \Illuminate\Support\Collection
+    {
+        // Chemins locaux déjà attribués à un film ou un épisode.
+        $takenPaths = Media::query()->where('video_provider', 'local')->whereNotNull('video_path')->pluck('video_path')
+            ->concat(Episode::query()->where('video_provider', 'local')->whereNotNull('video_path')->pluck('video_path'))
+            ->filter()->unique()->all();
+
+        return BunnyUpload::query()
+            ->whereNotNull('local_path')
+            ->latest()
+            ->get()
+            ->filter(fn (BunnyUpload $u) => $u->hasLocalCopy())
+            ->filter(function (BunnyUpload $u) use ($takenPaths, $includeGuid) {
+                $guid = 'local:'.$u->id;
+                if ($includeGuid && $guid === $includeGuid) {
+                    return true; // toujours inclure la vidéo en cours d'édition
+                }
+                return ! in_array($u->local_path, $takenPaths, true);
+            })
+            ->filter(function (BunnyUpload $u) use ($q) {
+                if ($q === '') return true;
+                return stripos($u->title, $q) !== false || stripos($u->original_filename, $q) !== false;
+            })
+            ->values()
+            ->map(fn (BunnyUpload $u) => [
+                'guid'   => 'local:'.$u->id,
+                'title'  => $u->title.' (local)',
+                'length' => 0,
+                'thumb'  => null,
+                'size'   => (int) $u->size_bytes,
+                'status' => 4, // traité comme "prête" côté picker
+                'source' => 'local',
+            ]);
     }
 
     /**
