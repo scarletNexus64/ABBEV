@@ -1,0 +1,31 @@
+# ---------------------------------------------------------------------------
+# Worker systemd — transfert des vidéos vers Bunny (queue dédiée "bunny")
+#
+# Installe :
+#   sudo cp deploy/systemd/abbev-bunny-worker.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now abbev-bunny-worker
+#   sudo systemctl status abbev-bunny-worker
+#   journalctl -u abbev-bunny-worker -f      # voir les logs en direct
+#
+# Adapte : WorkingDirectory, ExecStart (chemins projet + php), User/Group.
+# Pas de --timeout court : un PUT de plusieurs Go est légitime.
+# ---------------------------------------------------------------------------
+[Unit]
+Description=ABBEV Bunny upload worker (queue bunny)
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/abbev
+ExecStart=/usr/bin/php /var/www/abbev/artisan queue:work bunny --queue=bunny --timeout=0 --tries=3 --sleep=3 --backoff=30
+Restart=always
+RestartSec=5
+# Laisse le worker finir un transfert en cours avant de le tuer (gros fichiers).
+TimeoutStopSec=7200
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target
