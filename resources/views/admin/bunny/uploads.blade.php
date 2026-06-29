@@ -403,4 +403,3 @@
 })();
 </script>
 @endpush
-@endsection
