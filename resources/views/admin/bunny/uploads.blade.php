@@ -187,21 +187,21 @@
                             <td class="px-3 py-3 text-gray-500 whitespace-nowrap">{{ $u->created_at?->diffForHumans(null, true) }}</td>
 
                             <td class="px-4 py-3" data-cell="actions">
-                                <div class="flex flex-wrap items-center justify-end gap-1.5">
+                                <div class="flex items-center justify-end gap-1.5">
                                     @if($localReady)
                                         <a href="{{ asset('storage/' . $u->local_path) }}" target="_blank" title="Lire en local"
-                                           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-dark-200 hover:bg-dark-300 text-green-300 text-xs"><i class="fas fa-play"></i> Lire</a>
+                                           class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-dark-200 hover:bg-dark-300 text-green-300"><i class="fas fa-play text-xs"></i></a>
                                     @endif
                                     @if($hasFile)
                                         <a href="{{ route('admin.bunny.uploads.download', $u->id) }}" title="Télécharger l'original"
-                                           class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-dark-200 hover:bg-dark-300 text-gray-300 text-xs"><i class="fas fa-download"></i> Original</a>
+                                           class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-dark-200 hover:bg-dark-300 text-gray-300"><i class="fas fa-download text-xs"></i></a>
                                     @endif
                                     @if($hasFile && $u->status === 'failed')
                                         <button type="button" data-retry-row="{{ $u->id }}" title="Relancer vers Bunny"
-                                                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-dark-200 hover:bg-dark-300 text-amber-300 text-xs"><i class="fas fa-rotate-right"></i> Relancer</button>
+                                                class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-dark-200 hover:bg-dark-300 text-amber-300"><i class="fas fa-rotate-right text-xs"></i></button>
                                     @endif
                                     <button type="button" data-del-row="{{ $u->id }}" title="Supprimer"
-                                            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-dark-200 hover:bg-red-500/30 text-red-300 text-xs"><i class="fas fa-trash"></i> Suppr.</button>
+                                            class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-dark-200 hover:bg-red-500/30 text-red-300"><i class="fas fa-trash text-xs"></i></button>
                                 </div>
                             </td>
                         </tr>
@@ -428,7 +428,8 @@
     }
     function afterDelete(d){
         if(d.skipped && d.skipped.length){
-            sessionStorage.setItem('bunny-del-msg', `${d.deleted} supprimée(s). Ignorée(s), rattachée(s) à un film/épisode : `+d.skipped.map(s=>s.title).join(', '));
+            const lines = d.skipped.map(s=>`• ${s.title} — ${s.reason||'rattachée à un film/épisode'}`).join('\n');
+            sessionStorage.setItem('bunny-del-msg', `${d.deleted} supprimée(s).\nNon supprimée(s) :\n${lines}`);
         }
         window.location.reload();
     }

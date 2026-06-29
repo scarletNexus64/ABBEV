@@ -294,10 +294,13 @@ class BunnyUploadController extends Controller
     private function deleteOne(BunnyUpload $upload): array
     {
         if ($upload->local_path) {
-            $used = \App\Models\Media::where('video_provider', 'local')->where('video_path', $upload->local_path)->exists()
-                || \App\Models\Episode::where('video_provider', 'local')->where('video_path', $upload->local_path)->exists();
-            if ($used) {
-                return ['deleted' => false, 'reason' => 'Rattachée à un film/épisode — détache-la d’abord.'];
+            $media = \App\Models\Media::where('video_provider', 'local')->where('video_path', $upload->local_path)->first();
+            $ep    = \App\Models\Episode::where('video_provider', 'local')->where('video_path', $upload->local_path)->first();
+            if ($media || $ep) {
+                $where = $media ? 'le film « '.$media->title.' »'
+                    : 'un épisode de « '.optional(optional($ep->season)->media)->title.' »';
+
+                return ['deleted' => false, 'reason' => 'Utilisée par '.$where.' — change/retire sa vidéo d’abord.'];
             }
         }
 
