@@ -107,7 +107,7 @@
 
                         <!-- Champ de recherche -->
                         <input x-show="!selected" type="text" x-model="query" @input.debounce.300ms="refresh()"
-                               placeholder="🔍 Rechercher une vidéo Bunny disponible…"
+                               placeholder="🔍 Rechercher par nom — vidéos Bunny et locales…"
                                class="w-full bg-dark-50 border border-dark-200 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20" />
 
                         <!-- Liste résultats -->

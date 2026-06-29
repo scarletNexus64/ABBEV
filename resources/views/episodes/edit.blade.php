@@ -8,6 +8,13 @@
     $bunny = app(\App\Services\BunnyStreamService::class);
     $bunnyThumb = ($episode->video_provider === 'bunny' && $episode->video_id && $bunny->isConfigured())
         ? $bunny->thumbnailUrl($episode->video_id) : null;
+
+    // Jeton de la vidéo actuelle pour pré-sélectionner le picker (Bunny ou locale).
+    $currentVideoToken = $episode->video_id;
+    if ($episode->video_provider === 'local' && $episode->video_path) {
+        $lu = \App\Models\BunnyUpload::where('local_path', $episode->video_path)->first();
+        $currentVideoToken = $lu ? 'local:' . $lu->id : null;
+    }
 @endphp
 
 <div class="max-w-4xl mx-auto">
@@ -35,7 +42,7 @@
                 Vidéo Bunny <span class="text-red-400 text-sm">*</span>
             </h3>
 
-            <div x-data="bunnyPicker({{ json_encode($episode->video_id ?? '') }})" x-init="init()">
+            <div x-data="bunnyPicker({{ json_encode($currentVideoToken ?? '') }})" x-init="init()">
                 <input type="hidden" name="bunny_video_id" :value="selected?.guid || ''">
 
                 <template x-if="selected">
@@ -52,7 +59,7 @@
                 </template>
 
                 <input x-show="!selected" type="text" x-model="query" @input.debounce.300ms="refresh()"
-                       placeholder="🔍 Rechercher une vidéo Bunny disponible…"
+                       placeholder="🔍 Rechercher par nom — vidéos Bunny et locales…"
                        class="w-full bg-dark-50 border border-dark-200 rounded-lg px-4 py-3 text-white" />
 
                 <div x-show="!selected" class="mt-2 max-h-72 overflow-y-auto bg-dark-50 border border-dark-200 rounded-lg divide-y divide-dark-200">

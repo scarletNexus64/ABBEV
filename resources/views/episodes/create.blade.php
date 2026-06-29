@@ -46,7 +46,7 @@
                 </template>
 
                 <input x-show="!selected" type="text" x-model="query" @input.debounce.300ms="refresh()"
-                       placeholder="🔍 Rechercher une vidéo Bunny disponible…"
+                       placeholder="🔍 Rechercher par nom — vidéos Bunny et locales…"
                        class="w-full bg-dark-50 border border-dark-200 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary-500" />
 
                 <div x-show="!selected" class="mt-2 max-h-72 overflow-y-auto bg-dark-50 border border-dark-200 rounded-lg divide-y divide-dark-200">

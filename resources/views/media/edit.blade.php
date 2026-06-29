@@ -17,6 +17,16 @@
         ? $bunny->thumbnailUrl($medium->video_id) : null;
     $bunnyTitle  = $medium->video_metadata['title'] ?? null;
     $bunnyLength = $medium->video_metadata['length'] ?? null;
+
+    // Jeton de la vidéo actuellement attribuée, pour pré-sélectionner le picker :
+    // - Bunny  → le guid
+    // - locale → "local:{id}" de l'upload correspondant (sinon le picker s'ouvre vide
+    //            et un enregistrement sans re-sélection serait refusé).
+    $currentVideoToken = $medium->video_id;
+    if ($medium->video_provider === 'local' && $medium->video_path) {
+        $lu = \App\Models\BunnyUpload::where('local_path', $medium->video_path)->first();
+        $currentVideoToken = $lu ? 'local:' . $lu->id : null;
+    }
 @endphp
 
 <div class="max-w-5xl mx-auto" x-data="{ type: '{{ old('type', $medium->type) }}', openSeasonModal: false }">
@@ -60,7 +70,7 @@
                 <div x-show="type === 'movie'">
                     <label class="block text-sm font-medium text-gray-300 mb-2">Vidéo Bunny <span class="text-primary-400">*</span></label>
 
-                    <div x-data="bunnyPicker({{ json_encode(old('bunny_video_id', $medium->video_id ?? '')) }})" x-init="init()">
+                    <div x-data="bunnyPicker({{ json_encode(old('bunny_video_id', $currentVideoToken ?? '')) }})" x-init="init()">
                         <input type="hidden" name="bunny_video_id" :value="selected?.guid || ''">
 
                         <template x-if="selected">
@@ -77,7 +87,7 @@
                         </template>
 
                         <input x-show="!selected" type="text" x-model="query" @input.debounce.300ms="refresh()"
-                               placeholder="🔍 Rechercher une vidéo Bunny disponible…"
+                               placeholder="🔍 Rechercher par nom — vidéos Bunny et locales…"
                                class="w-full bg-dark-50 border border-dark-200 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary-500" />
 
                         <div x-show="!selected" class="mt-2 max-h-64 overflow-y-auto bg-dark-50 border border-dark-200 rounded-lg divide-y divide-dark-200">
