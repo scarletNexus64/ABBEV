@@ -30,14 +30,30 @@ class BunnyUploadController extends Controller
     {
     }
 
-    /** Page d'upload + liste des uploads récents. */
-    public function index(): View
+    /** Page d'upload + liste paginée (recherche + filtre côté serveur). */
+    public function index(Request $request): View
     {
-        $uploads = BunnyUpload::latest()->limit(50)->get();
+        $q      = trim((string) $request->get('q', ''));
+        $status = (string) $request->get('status', '');
+
+        $query = BunnyUpload::query()->latest();
+
+        if ($q !== '') {
+            $query->where('title', 'like', '%'.$q.'%');
+        }
+        if ($status === 'progress') {
+            $query->whereIn('status', ['uploading', 'transferring', 'processing']);
+        } elseif (in_array($status, ['queued', 'ready', 'failed'], true)) {
+            $query->where('status', $status);
+        }
+
+        $uploads = $query->paginate(12)->withQueryString();
 
         return view('admin.bunny.uploads', [
             'uploads'    => $uploads,
             'configured' => $this->bunny->isConfigured(),
+            'q'          => $q,
+            'status'     => $status,
         ]);
     }
 

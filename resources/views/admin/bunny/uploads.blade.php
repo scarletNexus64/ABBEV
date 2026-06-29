@@ -14,13 +14,6 @@
         'failed'       => ['Échec',      'bg-red-500/15 text-red-300 border-red-500/30',         'fa-circle-exclamation'],
     ];
     $human = function ($b) { $u=['o','Ko','Mo','Go','To']; $i=0; $b=(float)$b; while($b>=1024 && $i<count($u)-1){$b/=1024;$i++;} return round($b, $i?1:0).' '.$u[$i]; };
-    $counts = [
-        'total'    => $uploads->count(),
-        'progress' => $uploads->whereIn('status', ['uploading','transferring','processing'])->count(),
-        'queued'   => $uploads->where('status','queued')->count(),
-        'ready'    => $uploads->where('status','ready')->count(),
-        'failed'   => $uploads->where('status','failed')->count(),
-    ];
 @endphp
 
 <div class="space-y-6" id="bunny-upload-app"
@@ -91,21 +84,27 @@
         <div class="px-5 py-4 border-b border-dark-200 flex flex-col lg:flex-row lg:items-center gap-3 lg:justify-between">
             <div class="flex items-center gap-3">
                 <h3 class="text-white font-semibold whitespace-nowrap"><i class="fas fa-photo-film mr-2 text-gray-400"></i>Mes vidéos</h3>
-                <span class="text-xs text-gray-500">{{ $counts['total'] }} au total</span>
+                <span class="text-xs text-gray-500">{{ $uploads->total() }} au total</span>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <div class="relative">
-                    <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
-                    <input type="text" id="bunny-search" placeholder="Rechercher par nom…"
-                           class="bg-dark-50 border border-dark-200 rounded-lg pl-8 pr-3 py-2 text-sm text-white w-52 focus:outline-none focus:border-primary-500">
-                </div>
-                <select id="bunny-filter" class="bg-dark-50 border border-dark-200 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary-500">
-                    <option value="">Tous les statuts</option>
-                    <option value="progress">En cours</option>
-                    <option value="queued">En file</option>
-                    <option value="ready">Prête</option>
-                    <option value="failed">Échec</option>
-                </select>
+                {{-- Recherche + filtre côté serveur (GET, auto-submit). --}}
+                <form method="GET" action="{{ route('admin.bunny.uploads.index') }}" id="bunny-filter-form" class="flex flex-wrap items-center gap-2">
+                    <div class="relative">
+                        <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs"></i>
+                        <input type="text" name="q" value="{{ $q }}" placeholder="Rechercher par nom…"
+                               class="bg-dark-50 border border-dark-200 rounded-lg pl-8 pr-3 py-2 text-sm text-white w-52 focus:outline-none focus:border-primary-500">
+                    </div>
+                    <select name="status" onchange="this.form.submit()" class="bg-dark-50 border border-dark-200 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary-500">
+                        <option value="" {{ $status === '' ? 'selected' : '' }}>Tous les statuts</option>
+                        <option value="progress" {{ $status === 'progress' ? 'selected' : '' }}>En cours</option>
+                        <option value="queued" {{ $status === 'queued' ? 'selected' : '' }}>En file</option>
+                        <option value="ready" {{ $status === 'ready' ? 'selected' : '' }}>Prête</option>
+                        <option value="failed" {{ $status === 'failed' ? 'selected' : '' }}>Échec / local</option>
+                    </select>
+                    @if($q !== '' || $status !== '')
+                        <a href="{{ route('admin.bunny.uploads.index') }}" class="text-xs text-gray-400 hover:text-white px-2 py-2" title="Réinitialiser"><i class="fas fa-xmark"></i></a>
+                    @endif
+                </form>
                 <span id="bunny-sel-count" class="text-xs text-gray-400"></span>
                 <button type="button" id="bunny-delete-btn" disabled
                         class="bg-red-500/80 hover:bg-red-600 disabled:opacity-30 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap">
@@ -209,12 +208,64 @@
                     @empty
                         <tr id="bunny-empty"><td colspan="6" class="px-6 py-10 text-center text-gray-500">
                             <i class="fas fa-inbox text-3xl mb-2 block opacity-50"></i>
-                            Aucune vidéo pour l'instant. Glissez vos premiers fichiers ci-dessus.
+                            @if($q !== '' || $status !== '')
+                                Aucun résultat pour ce filtre.
+                            @else
+                                Aucune vidéo pour l'instant. Glissez vos premiers fichiers ci-dessus.
+                            @endif
                         </td></tr>
                     @endforelse
                 </tbody>
             </table>
-            <div id="bunny-no-results" class="hidden px-6 py-8 text-center text-gray-500 text-sm">Aucun résultat pour ce filtre.</div>
+        </div>
+
+        {{-- Pagination côté serveur --}}
+        @if($uploads->hasPages())
+            <div class="px-5 py-3 border-t border-dark-200 flex items-center justify-between gap-3">
+                <span class="text-xs text-gray-500">
+                    Affichage {{ $uploads->firstItem() }}–{{ $uploads->lastItem() }} sur {{ $uploads->total() }}
+                </span>
+                <div class="flex items-center gap-1.5">
+                    @if($uploads->onFirstPage())
+                        <span class="px-3 py-1.5 rounded-lg bg-dark-200/40 text-gray-600 text-sm cursor-not-allowed"><i class="fas fa-chevron-left mr-1 text-xs"></i>Précédent</span>
+                    @else
+                        <a href="{{ $uploads->previousPageUrl() }}" class="px-3 py-1.5 rounded-lg bg-dark-200 hover:bg-dark-300 text-gray-300 text-sm"><i class="fas fa-chevron-left mr-1 text-xs"></i>Précédent</a>
+                    @endif
+                    <span class="px-3 py-1.5 text-gray-400 text-xs">Page {{ $uploads->currentPage() }} / {{ $uploads->lastPage() }}</span>
+                    @if($uploads->hasMorePages())
+                        <a href="{{ $uploads->nextPageUrl() }}" class="px-3 py-1.5 rounded-lg bg-dark-200 hover:bg-dark-300 text-gray-300 text-sm">Suivant<i class="fas fa-chevron-right ml-1 text-xs"></i></a>
+                    @else
+                        <span class="px-3 py-1.5 rounded-lg bg-dark-200/40 text-gray-600 text-sm cursor-not-allowed">Suivant<i class="fas fa-chevron-right ml-1 text-xs"></i></span>
+                    @endif
+                </div>
+            </div>
+        @endif
+    </div>
+
+    {{-- Modale de confirmation de suppression (personnalisée) --}}
+    <div id="bunny-del-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" data-modal-close></div>
+        <div class="relative bg-dark-100 border border-dark-200 rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div class="flex items-start gap-4">
+                <div class="w-11 h-11 rounded-full bg-red-500/15 text-red-400 flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-trash-can"></i>
+                </div>
+                <div class="min-w-0">
+                    <h3 class="text-white font-semibold text-lg">Supprimer <span id="bunny-del-count">cette vidéo</span> ?</h3>
+                    <p class="text-gray-400 text-sm mt-1">
+                        Le(s) fichier(s) local(aux) seront définitivement effacés.
+                        Les vidéos rattachées à un film ou un épisode seront <span class="text-gray-200">ignorées</span>.
+                    </p>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-6">
+                <button type="button" data-modal-close
+                        class="px-4 py-2 rounded-lg bg-dark-200 hover:bg-dark-300 text-gray-200 text-sm font-medium transition">Annuler</button>
+                <button type="button" id="bunny-del-confirm"
+                        class="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition">
+                    <i class="fas fa-trash mr-1.5"></i>Supprimer
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -348,7 +399,25 @@
     }
     document.addEventListener('click',(e)=>{ const b=e.target.closest('[data-retry-row]'); if(b) retryUpload(b.dataset.retryRow); });
 
-    /* ---------- Suppression (ligne + sélection) ---------- */
+    /* ---------- Suppression via modale personnalisée ---------- */
+    const modal=document.getElementById('bunny-del-modal');
+    const delCountEl=document.getElementById('bunny-del-count');
+    const delConfirm=document.getElementById('bunny-del-confirm');
+    let pendingIds=[];
+
+    function openDelModal(ids){
+        if(!ids.length) return;
+        pendingIds=ids;
+        if(delCountEl) delCountEl.textContent = ids.length>1 ? `ces ${ids.length} vidéos` : 'cette vidéo';
+        if(delConfirm){ delConfirm.disabled=false; delConfirm.innerHTML='<i class="fas fa-trash mr-1.5"></i>Supprimer'; }
+        modal.classList.remove('hidden'); modal.classList.add('flex');
+    }
+    function closeDelModal(){ if(!modal) return; modal.classList.add('hidden'); modal.classList.remove('flex'); pendingIds=[]; }
+    if(modal){
+        modal.querySelectorAll('[data-modal-close]').forEach(el=>el.addEventListener('click', closeDelModal));
+        document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && !modal.classList.contains('hidden')) closeDelModal(); });
+    }
+
     async function deleteIds(ids){
         const r=await fetch(URL_BULK,{method:'POST',
             headers:{'Content-Type':'application/json','X-CSRF-TOKEN':CSRF,'Accept':'application/json'},
@@ -357,61 +426,45 @@
     }
     function afterDelete(d){
         if(d.skipped && d.skipped.length){
-            alert(`${d.deleted} supprimée(s).\nIgnorée(s) (rattachée à un film/épisode) :\n`+d.skipped.map(s=>'• '+s.title).join('\n'));
+            sessionStorage.setItem('bunny-del-msg', `${d.deleted} supprimée(s). Ignorée(s), rattachée(s) à un film/épisode : `+d.skipped.map(s=>s.title).join(', '));
         }
         window.location.reload();
     }
-    document.addEventListener('click', async (e)=>{
-        const b=e.target.closest('[data-del-row]'); if(!b) return;
-        if(!confirm('Supprimer cette vidéo ? Le fichier local sera effacé.')) return;
-        try{ afterDelete(await deleteIds([Number(b.dataset.delRow)])); }
-        catch(d){ alert(d.message||'Suppression impossible.'); }
+    if(delConfirm) delConfirm.addEventListener('click', async ()=>{
+        if(!pendingIds.length) return;
+        delConfirm.disabled=true; delConfirm.innerHTML='<i class="fas fa-spinner fa-spin mr-1.5"></i>Suppression…';
+        try{ afterDelete(await deleteIds(pendingIds)); }
+        catch(d){ closeDelModal(); alert(d.message||'Suppression impossible.'); }
     });
 
+    // Suppression par ligne → ouvre la modale.
+    document.addEventListener('click',(e)=>{ const b=e.target.closest('[data-del-row]'); if(b) openDelModal([Number(b.dataset.delRow)]); });
+
+    /* ---------- Sélection multiple ---------- */
     const checkAll=document.getElementById('bunny-check-all');
     const delBtn=document.getElementById('bunny-delete-btn');
     const selCount=document.getElementById('bunny-sel-count');
     const rowChecks=()=>Array.from(document.querySelectorAll('.bunny-row-check'));
-    const selectedIds=()=>rowChecks().filter(c=>c.checked && c.closest('tr').style.display!=='none').map(c=>Number(c.value));
+    const selectedIds=()=>rowChecks().filter(c=>c.checked).map(c=>Number(c.value));
     function refreshSel(){
         const n=selectedIds().length;
         if(delBtn) delBtn.disabled=n===0;
         if(selCount) selCount.textContent=n?`${n} sélectionnée(s)`:'';
-        if(checkAll){ const vis=rowChecks().filter(c=>c.closest('tr').style.display!=='none'); checkAll.checked=vis.length>0&&vis.every(c=>c.checked); checkAll.indeterminate=vis.some(c=>c.checked)&&!checkAll.checked; }
+        if(checkAll){ const all=rowChecks(); checkAll.checked=all.length>0&&all.every(c=>c.checked); checkAll.indeterminate=all.some(c=>c.checked)&&!checkAll.checked; }
     }
-    if(checkAll) checkAll.addEventListener('change',()=>{ rowChecks().forEach(c=>{ if(c.closest('tr').style.display!=='none') c.checked=checkAll.checked; }); refreshSel(); });
+    if(checkAll) checkAll.addEventListener('change',()=>{ rowChecks().forEach(c=>{ c.checked=checkAll.checked; }); refreshSel(); });
     document.addEventListener('change',(e)=>{ if(e.target.classList.contains('bunny-row-check')) refreshSel(); });
-    if(delBtn) delBtn.addEventListener('click', async ()=>{
-        const ids=selectedIds(); if(!ids.length) return;
-        if(!confirm(`Supprimer ${ids.length} vidéo(s) ? Les fichiers locaux seront effacés. Les vidéos rattachées à un film/épisode seront ignorées.`)) return;
-        delBtn.disabled=true; delBtn.innerHTML='<i class="fas fa-spinner fa-spin mr-1.5"></i>Suppression…';
-        try{ afterDelete(await deleteIds(ids)); }
-        catch(d){ alert(d.message||'Suppression impossible.'); delBtn.disabled=false; delBtn.innerHTML='<i class="fas fa-trash mr-1.5"></i>Supprimer'; }
-    });
+    if(delBtn) delBtn.addEventListener('click', ()=> openDelModal(selectedIds()));
 
-    /* ---------- Recherche + filtre ---------- */
-    const search=document.getElementById('bunny-search');
-    const filter=document.getElementById('bunny-filter');
-    const noRes=document.getElementById('bunny-no-results');
-    function applyFilter(){
-        const q=(search?.value||'').toLowerCase().trim();
-        const f=filter?.value||'';
-        let visible=0;
-        tableBody.querySelectorAll('tr[data-upload-id]').forEach(row=>{
-            const t=row.dataset.title||''; const s=row.dataset.status||'';
-            let ok = (!q || t.includes(q));
-            if(ok && f){
-                if(f==='progress') ok=IN_PROGRESS.includes(s);
-                else ok = s===f;
-            }
-            row.style.display = ok ? '' : 'none';
-            if(ok) visible++;
-        });
-        if(noRes) noRes.classList.toggle('hidden', visible>0);
-        refreshSel();
-    }
-    if(search) search.addEventListener('input', applyFilter);
-    if(filter) filter.addEventListener('change', applyFilter);
+    /* ---------- Recherche serveur : auto-submit débauncé ---------- */
+    const fForm=document.getElementById('bunny-filter-form');
+    const fSearch=fForm?.querySelector('input[name="q"]');
+    let sT=null;
+    if(fSearch) fSearch.addEventListener('input', ()=>{ clearTimeout(sT); sT=setTimeout(()=>fForm.submit(), 600); });
+
+    // Message après rechargement (suppressions ignorées).
+    const delMsg=sessionStorage.getItem('bunny-del-msg');
+    if(delMsg){ sessionStorage.removeItem('bunny-del-msg'); setTimeout(()=>alert(delMsg), 150); }
 
     refreshSel();
     ensurePolling();
