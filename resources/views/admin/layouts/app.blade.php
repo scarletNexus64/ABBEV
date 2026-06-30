@@ -153,15 +153,17 @@
                     @endif
 
                     @php
-                        $__activeUploads = \App\Models\BunnyUpload::whereNotIn('status', \App\Models\BunnyUpload::TERMINAL)->count();
+                        $__activeUploadsQuery = \App\Models\BunnyUpload::whereNotIn('status', \App\Models\BunnyUpload::TERMINAL);
+                        if (auth()->user()->role === 'producer') {
+                            $__activeUploadsQuery->where('user_id', auth()->id());
+                        }
+                        $__activeUploads = $__activeUploadsQuery->count();
                     @endphp
                     <a href="{{ route('admin.bunny.uploads.index') }}"
                        class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('admin.bunny.uploads.*') || request()->routeIs('admin.bunny.upload.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
                         <i class="fas fa-cloud-arrow-up w-5 mr-3"></i>
                         Upload vidéos
-                        @if($__activeUploads > 0)
-                            <span class="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold rounded-full bg-blue-500 text-white animate-pulse">{{ $__activeUploads }}</span>
-                        @endif
+                        <span id="sidebar-upload-badge" class="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold rounded-full bg-blue-500 text-white animate-pulse {{ $__activeUploads > 0 ? '' : 'hidden' }}">{{ $__activeUploads }}</span>
                     </a>
                 </div>
 
@@ -341,7 +343,7 @@
 
         /* ====== MOTEUR D'UPLOAD (Resumable.js, persistant) ====== */
         const UE = ABBEV.uploads = {
-            r: null, inFlight: 0, items: new Map(), pollTimer: null, widgetOpen: true,
+            r: null, inFlight: 0, items: new Map(), pollTimer: null, widgetOpen: true, _serverActive: 0,
 
             init() {
                 if (this.r || !window.Resumable) return;
@@ -406,7 +408,16 @@
 
             emit(t, d) { window.dispatchEvent(new CustomEvent('abbev:upload-'+t, {detail:d})); },
 
+            updateSidebarBadge() {
+                const badge = document.getElementById('sidebar-upload-badge');
+                if (!badge) return;
+                const n = this.items.size + (this._serverActive || 0);
+                badge.textContent = n;
+                badge.classList.toggle('hidden', n === 0);
+            },
+
             updateWidget() {
+                this.updateSidebarBadge();
                 const w = document.getElementById('abbev-upload-widget');
                 if (!w) return;
                 const n = this.items.size;
@@ -444,6 +455,9 @@
                     const r=await fetch('/admin/bunny/uploads/active',{headers:{'Accept':'application/json'}});
                     if(!r.ok){this.pollTimer=setTimeout(()=>this.poll(),5000);return;}
                     const{data}=await r.json();
+                    const serverIds=(data||[]).filter(u=>!this.items.has(u.id));
+                    this._serverActive=serverIds.length;
+                    this.updateSidebarBadge();
                     this.emit('status',{data:data||[]});
                     this.pollTimer=(data||[]).length>0?setTimeout(()=>this.poll(),3000):null;
                 }catch(e){this.pollTimer=setTimeout(()=>this.poll(),5000);}

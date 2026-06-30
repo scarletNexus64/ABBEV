@@ -8,6 +8,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\EpisodeController;
 use App\Http\Controllers\ProducerController;
+use App\Http\Controllers\ScreeningController;
 use Illuminate\Support\Facades\Route;
 
 // Root redirect to admin login
@@ -83,6 +84,7 @@ Route::middleware(['auth', 'role:admin,producer'])->group(function () {
 */
 Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::resource('categories', CategoryController::class);
+    Route::resource('screenings', ScreeningController::class);
     Route::get('/settings', [App\Http\Controllers\SettingController::class, 'index'])->name('settings.index');
 });
 
