@@ -30,8 +30,20 @@ class AuthApiController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
+            // Numéro (avec indicatif) — saisi à l'inscription pour l'OTP futur.
+            'phone' => 'nullable|string|max:32',
             'country_code' => 'required|string|size:2|exists:countries,code',
             'currency_code' => 'nullable|string|size:3|exists:currencies,code',
+        ], [
+            'name.required'      => 'Le nom est requis.',
+            'email.required'     => "L'adresse email est requise.",
+            'email.email'        => "L'adresse email n'est pas valide.",
+            'email.unique'       => 'Cette adresse email est déjà utilisée.',
+            'password.required'  => 'Le mot de passe est requis.',
+            'password.min'       => 'Le mot de passe doit contenir au moins 8 caractères.',
+            'password.confirmed' => 'Les mots de passe ne correspondent pas.',
+            'country_code.required' => 'Veuillez sélectionner votre pays.',
+            'country_code.exists'   => 'Pays invalide.',
         ]);
 
         $locale = $this->resolveLocale($data['country_code'], $data['currency_code'] ?? null);
@@ -40,6 +52,7 @@ class AuthApiController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
+            'phone' => $data['phone'] ?? null,
             'role' => 'user',
             'country_code' => $locale['country_code'],
             'currency_code' => $locale['currency_code'],
@@ -259,6 +272,13 @@ class AuthApiController extends Controller
             ])->save();
         }
 
+        // Compte suspendu par un admin → accès refusé (aucun token émis).
+        if (! $user->is_active) {
+            return response()->json([
+                'message' => 'Ce compte a été suspendu. Contactez le support.',
+            ], 403);
+        }
+
         if (is_null($user->email_verified_at)) {
             $user->forceFill(['email_verified_at' => now()])->save();
         }
@@ -270,6 +290,145 @@ class AuthApiController extends Controller
             'user' => $user,
             'token' => $token,
             'token_type' => 'Bearer',
+        ]);
+    }
+
+    /**
+     * Mot de passe oublié (#6) — envoie un code à 6 chiffres par email, sur le
+     * même mécanisme que l'OTP d'inscription (table EmailVerification).
+     *
+     * Anti-énumération : on répond TOUJOURS le même message, qu'un compte
+     * existe ou non (empêche de deviner les emails inscrits). Le code n'est
+     * réellement envoyé que si le compte existe.
+     */
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $email = $data['email'];
+        $user = User::where('email', $email)->first();
+
+        if ($user) {
+            $code = $this->isOtpTestEmail($email)
+                ? (string) config('auth.otp_test_code')
+                : (string) random_int(100000, 999999);
+
+            EmailVerification::updateOrCreate(
+                ['email' => $email],
+                [
+                    'code' => $code,
+                    'expires_at' => Carbon::now()->addMinutes(15),
+                    'verified' => false,
+                ]
+            );
+
+            if (! $this->isOtpTestEmail($email)) {
+                try {
+                    Mail::raw(
+                        "Bonjour,\n\nVotre code de réinitialisation de mot de passe ABBEV est : $code\n\n".
+                        "Ce code expire dans 15 minutes.\n\n".
+                        "Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.\n\nL'équipe ABBEV",
+                        function ($message) use ($email) {
+                            $message->to($email)
+                                ->subject('Réinitialisation de mot de passe - ABBEV');
+                        }
+                    );
+                } catch (\Throwable $e) {
+                    Log::error('[forgotPassword] envoi email échoué', [
+                        'error' => $e->getMessage(),
+                    ]);
+                    // Message générique quoi qu'il arrive (anti-énumération).
+                }
+            }
+        }
+
+        return response()->json([
+            'message' => 'Si un compte existe pour cet email, un code de réinitialisation a été envoyé.',
+        ]);
+    }
+
+    /**
+     * Vérifie le code de réinitialisation SANS le consommer : permet à l'app de
+     * débloquer l'écran « nouveau mot de passe » après saisie du bon code.
+     */
+    public function verifyResetCode(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => 'required|email',
+            'code' => 'required|string|size:6',
+        ]);
+
+        $record = EmailVerification::where('email', $data['email'])
+            ->where('code', $data['code'])
+            ->where('expires_at', '>', now())
+            ->where('verified', false)
+            ->first();
+
+        if (! $record) {
+            throw ValidationException::withMessages([
+                'code' => ['Code invalide ou expiré.'],
+            ]);
+        }
+
+        return response()->json(['message' => 'Code valide.', 'valid' => true]);
+    }
+
+    /**
+     * Réinitialise le mot de passe : email + code + nouveau mot de passe.
+     * Consomme le code, révoque les anciens tokens (sécurité) et retourne un
+     * nouveau token (connexion automatique après réinitialisation).
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => 'required|email',
+            'code' => 'required|string|size:6',
+            'password' => 'required|string|min:8|confirmed',
+            'device_name' => 'nullable|string|max:255',
+        ]);
+
+        $record = EmailVerification::where('email', $data['email'])
+            ->where('code', $data['code'])
+            ->where('expires_at', '>', now())
+            ->where('verified', false)
+            ->first();
+
+        if (! $record) {
+            throw ValidationException::withMessages([
+                'code' => ['Code invalide ou expiré.'],
+            ]);
+        }
+
+        $user = User::where('email', $data['email'])->first();
+        if (! $user) {
+            throw ValidationException::withMessages([
+                'email' => ['Aucun compte associé à cet email.'],
+            ]);
+        }
+
+        if (! $user->is_active) {
+            return response()->json([
+                'message' => 'Ce compte a été suspendu. Contactez le support.',
+            ], 403);
+        }
+
+        $user->forceFill(['password' => Hash::make($data['password'])])->save();
+        $record->update(['verified' => true]);
+
+        // Révoque toutes les sessions existantes : après un reset, on déconnecte
+        // les autres appareils par sécurité.
+        $user->tokens()->delete();
+
+        $deviceName = $data['device_name'] ?? ($request->userAgent() ?: 'api');
+        $token = $user->createToken($deviceName)->plainTextToken;
+
+        return response()->json([
+            'user' => $user,
+            'token' => $token,
+            'token_type' => 'Bearer',
+            'message' => 'Mot de passe réinitialisé avec succès.',
         ]);
     }
 
@@ -288,26 +447,44 @@ class AuthApiController extends Controller
     }
 
     /**
-     * Mise à jour partielle du profil. Pour l'instant, seuls le pays et la
-     * devise sont éditables — l'app expose un sélecteur dans l'écran profil.
+     * Mise à jour partielle du profil : nom, photo (avatar), pays et devise.
+     * Tous les champs sont optionnels — on ne met à jour que ce qui est fourni.
      */
     public function updateMe(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'country_code' => 'required|string|size:2|exists:countries,code',
+            'name' => 'sometimes|string|min:2|max:255',
+            'avatar' => 'sometimes|image|mimes:jpeg,jpg,png,webp|max:4096',
+            'country_code' => 'sometimes|string|size:2|exists:countries,code',
             'currency_code' => 'nullable|string|size:3|exists:currencies,code',
         ]);
 
-        $locale = $this->resolveLocale(
-            $data['country_code'],
-            $data['currency_code'] ?? null,
-        );
-
         $user = $request->user();
-        $user->forceFill([
-            'country_code' => $locale['country_code'],
-            'currency_code' => $locale['currency_code'],
-        ])->save();
+
+        if (array_key_exists('name', $data)) {
+            $user->name = $data['name'];
+        }
+
+        // Photo de profil : stockée sur le disque public (servie avec CORS via
+        // /media/img/...). On supprime l'ancienne pour ne pas accumuler.
+        if ($request->hasFile('avatar')) {
+            if ($user->avatar_path) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->avatar_path);
+            }
+            $user->avatar_path = $request->file('avatar')->store('avatars', 'public');
+        }
+
+        // Pays/devise : on ne réaligne que si un pays est fourni.
+        if (! empty($data['country_code'])) {
+            $locale = $this->resolveLocale(
+                $data['country_code'],
+                $data['currency_code'] ?? null,
+            );
+            $user->country_code = $locale['country_code'];
+            $user->currency_code = $locale['currency_code'];
+        }
+
+        $user->save();
 
         return response()->json([
             'user' => $this->serializeUser($user->load(['country', 'currency'])),
@@ -320,6 +497,9 @@ class AuthApiController extends Controller
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'avatarUrl' => $user->avatar_path
+                ? rtrim(config('app.url'), '/').'/media/img/'.ltrim($user->avatar_path, '/')
+                : null,
             'role' => $user->role,
             'country_code' => $user->country_code,
             'currency_code' => $user->currency_code,

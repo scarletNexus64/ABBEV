@@ -371,7 +371,8 @@
                     </a>
 
                     <form action="{{ route('media.destroy', $medium) }}" method="POST"
-                          onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce média ?');">
+                          data-confirm="Supprimer ce média ? Cette action est irréversible."
+                          data-confirm-type="danger" data-confirm-title="Supprimer le média" data-confirm-confirm="Supprimer">
                         @csrf
                         @method('DELETE')
                         <button type="submit"

@@ -90,6 +90,31 @@
     @endif
 </div>
 
+{{-- Gains producteur : vues générées + montant estimé (tarifs configurés par l'admin) --}}
+@if($isProducer && $earnings)
+<div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-6 mb-8">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+        <div>
+            <h3 class="text-white font-semibold text-lg"><i class="fas fa-coins mr-2 text-amber-400"></i>Mes revenus</h3>
+            <p class="text-gray-500 text-sm">Générés par les abonnements aux tiers de vos contenus.</p>
+        </div>
+        <div class="text-right">
+            <p class="text-3xl font-bold text-amber-300">{{ number_format($earnings['total_amount'], 2, ',', ' ') }} {{ $earnings['currency'] }}</p>
+            <p class="text-gray-400 text-sm">{{ number_format($earnings['total_views']) }} vue(s) au total</p>
+        </div>
+    </div>
+    <div class="grid grid-cols-3 gap-4">
+        @foreach(['classique' => 'sky', 'standard' => 'amber', 'premium' => 'fuchsia'] as $tier => $color)
+            <div class="bg-dark-200/40 rounded-lg p-4">
+                <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">{{ ucfirst($tier) }}</p>
+                <p class="text-white font-bold">{{ number_format($earnings['by_tier'][$tier]['views']) }} vues</p>
+                <p class="text-{{ $color }}-300 text-sm">{{ number_format($earnings['by_tier'][$tier]['amount'], 2, ',', ' ') }} {{ $earnings['currency'] }}</p>
+            </div>
+        @endforeach
+    </div>
+</div>
+@endif
+
 <!-- Secondary Stats -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
     <!-- Categories Card -->

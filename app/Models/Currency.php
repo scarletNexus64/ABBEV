@@ -36,4 +36,26 @@ class Currency extends Model
 
         return round($converted, (int) $this->decimals);
     }
+
+    /**
+     * Taux `rate_from_xof` d'un code devise (unités de la devise pour 1 XOF),
+     * ou `$default` si la devise est absente. Utilisé par les services de
+     * paiement pour convertir un montant de base (XOF) vers la devise débitée.
+     */
+    public static function rateFromXof(string $code, ?float $default = null): ?float
+    {
+        $currency = static::where('code', strtoupper($code))->first();
+
+        return $currency ? (float) $currency->rate_from_xof : $default;
+    }
+
+    /**
+     * Convertit un montant XOF vers un code devise (arrondi aux décimales de
+     * la devise). Retourne null si la devise est inconnue.
+     */
+    public static function convertFromXofTo(float $amountXof, string $code): ?float
+    {
+        return static::where('code', strtoupper($code))->first()
+            ?->convertFromXof($amountXof);
+    }
 }

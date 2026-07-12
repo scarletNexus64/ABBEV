@@ -10,6 +10,7 @@ use App\Services\BunnyStreamService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 
 /**
  * Délivre les URLs de lecture (videoUrl / embedUrl) UNIQUEMENT aux
@@ -177,7 +178,7 @@ class WatchApiController extends Controller
         // (le mode test ne remplace que les vidéos Bunny par un échantillon).
         if ($model->video_provider === 'local' && $model->video_path) {
             return [
-                'videoUrl' => asset('storage/' . ltrim($model->video_path, '/')),
+                'videoUrl' => $this->signedLocalUrl($model),
                 'embedUrl' => null,
                 'videoProvider' => 'local',
             ];
@@ -209,6 +210,24 @@ class WatchApiController extends Controller
             'embedUrl' => null,
             'videoProvider' => $model->video_provider,
         ];
+    }
+
+    /**
+     * URL SIGNÉE et expirante vers le streaming d'une vidéo locale.
+     * Générée seulement après vérification de l'abonnement : remplace l'ancien
+     * lien public permanent (partageable/téléchargeable à l'infini).
+     */
+    private function signedLocalUrl(Media|Episode $model, ?\DateTimeInterface $expiresAt = null, bool $download = false): string
+    {
+        $type = $model instanceof Episode ? 'episode' : 'movie';
+        $expiresAt ??= now()->addSeconds((int) config('services.bunny.token_ttl', 3600));
+
+        $params = ['type' => $type, 'id' => $model->getKey()];
+        if ($download) {
+            $params['dl'] = 1;
+        }
+
+        return URL::temporarySignedRoute('api.watch.local', $expiresAt, $params);
     }
 
     /**
@@ -254,13 +273,16 @@ class WatchApiController extends Controller
         string $type,
         string $label,
     ): JsonResponse {
-        // Vidéo locale : téléchargement direct depuis le serveur.
+        // Vidéo locale : URL de téléchargement SIGNÉE et expirante (plus de
+        // lien public permanent). Le fichier est servi par LocalVideoStreamController.
         if ($model->video_provider === 'local' && $model->video_path) {
-            $localUrl   = asset('storage/' . ltrim($model->video_path, '/'));
-            $localFile  = public_path('storage/' . ltrim($model->video_path, '/'));
+            $localFile  = \Illuminate\Support\Facades\Storage::disk('local')->path($model->video_path);
             $sizeBytes  = is_file($localFile) ? filesize($localFile) : null;
+            $ttl        = (int) config('services.bunny.download_token_ttl', 21600);
+            $expiresAt  = now()->addSeconds($ttl);
+            $localUrl   = $this->signedLocalUrl($model, $expiresAt, download: true);
 
-            Log::info('[Download] ✓ local file served', [
+            Log::info('[Download] ✓ local file served (signed)', [
                 'user_id'    => $request->user()->id,
                 'type'       => $type,
                 'id'         => $model->id,
@@ -270,7 +292,7 @@ class WatchApiController extends Controller
             return response()->json([
                 'data' => [
                     'downloadUrl' => $localUrl,
-                    'expiresAt'   => null,
+                    'expiresAt'   => $expiresAt->toIso8601String(),
                     'sizeBytes'   => $sizeBytes,
                     'contentType' => 'video/mp4',
                     'height'      => null,

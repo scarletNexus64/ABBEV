@@ -71,6 +71,7 @@ class MediaController extends Controller
 
             'is_featured'  => 'nullable|boolean',
             'published_at' => 'nullable|date',
+            'tier'         => 'nullable|in:classique,standard,premium',
         ]);
 
         // Pour un film, on EXIGE un video_id Bunny (sinon il n'y a rien à lire)
@@ -90,6 +91,10 @@ class MediaController extends Controller
 
         $data = $this->mediaPayload($request, $validated);
         $data['user_id'] = auth()->id(); // propriétaire = créateur (producteur ou admin)
+        $data['tier'] = $validated['tier'] ?? 'classique';
+        // Un contenu uploadé par un PRODUCTEUR passe en modération (l'assistant/
+        // l'admin le valide et confirme catégorie + tier). Un admin publie direct.
+        $data['moderation_status'] = auth()->user()->isProducer() ? 'pending' : 'approved';
 
         // Visuels
         foreach (['thumbnail', 'cover', 'banner'] as $imgField) {
@@ -147,6 +152,7 @@ class MediaController extends Controller
             'banner'    => 'nullable|image|mimes:jpeg,png,jpg,webp|max:8192',
             'is_featured'  => 'nullable|boolean',
             'published_at' => 'nullable|date',
+            'tier'         => 'nullable|in:classique,standard,premium',
         ]);
 
         if ($validated['type'] === 'movie' && empty($validated['bunny_video_id'])) {

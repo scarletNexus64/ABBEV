@@ -49,7 +49,11 @@ class SubscriptionPaymentController extends Controller
             'subscription_plan_id' => 'required|exists:subscription_plans,id',
             'payment_method' => 'required|in:paypal,freemopay,kpay,stripe',
             'phone_number' => 'required_if:payment_method,freemopay|required_if:payment_method,kpay|string',
-            'mobile_operator' => 'required_if:payment_method,kpay|in:MTN_MONEY,ORANGE_MONEY',
+            // Code opérateur KPay du catalogue (ex. ORANGE_CMR, AIRTEL_COD_CDF).
+            // Validé ensuite contre le pays (config/kpay.php).
+            'mobile_operator' => 'required_if:payment_method,kpay|string',
+            // Pays du paiement KPay (défaut : pays du compte, sinon Cameroun).
+            'country_code' => 'nullable|string|size:2',
         ]);
 
         try {
@@ -195,13 +199,60 @@ class SubscriptionPaymentController extends Controller
                 ]);
 
             } elseif ($validated['payment_method'] === 'kpay') {
-                // Initier paiement KPay (Mobile Money — USSD)
+                // Pays du paiement : celui fourni, sinon le pays du compte,
+                // sinon Cameroun (repli legacy). Résolu depuis config/kpay.php.
+                $countryCode = strtoupper($validated['country_code'] ?? $user->country_code ?? 'CM');
+                $country = config('kpay.countries.' . $countryCode);
+
+                if (! $country) {
+                    $transaction->update(['status' => 'failed']);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => "KPay n'est pas disponible dans votre pays ({$countryCode}).",
+                    ], 422);
+                }
+
+                $operator = $validated['mobile_operator'];
+                $operatorEntry = collect($country['operators'])
+                    ->firstWhere('code', $operator);
+                if (! $operatorEntry) {
+                    $transaction->update(['status' => 'failed']);
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Cet opérateur n'est pas disponible pour {$country['name']}.",
+                    ], 422);
+                }
+
+                // Montant réellement débité, converti depuis la base XOF vers la
+                // devise de l'OPÉRATEUR (au taux live) — un pays peut avoir
+                // plusieurs devises (ex. RDC : CDF ou USD). La transaction, elle,
+                // GARDE son montant en XOF (base canonique pour l'affichage).
+                $localCurrency = $operatorEntry['currency'];
+                $amountLocal = \App\Models\Currency::convertFromXofTo((float) $plan->price, $localCurrency)
+                    ?? (float) $plan->price;
+                $amountForKpay = ($amountLocal == floor($amountLocal))
+                    ? (int) $amountLocal
+                    : round($amountLocal, 2);
+
+                Log::info('[SubscriptionPayment] KPay montant converti', [
+                    'transaction_id' => $transaction->transaction_id,
+                    'country' => $countryCode,
+                    'price_xof' => (float) $plan->price,
+                    'amount_local' => $amountForKpay,
+                    'currency' => $localCurrency,
+                ]);
+
+                // Initier paiement KPay (Mobile Money — USSD). Le mapping
+                // opérateur→provider est fait dans initPayment selon le pays.
                 $result = $this->kpayService->initPayment([
-                    'amount' => (int) $plan->price,
-                    'provider' => $validated['mobile_operator'],
-                    // KPay exige le format international (2376XXXXXXXX) ; le
-                    // mobile saisit un numéro local (6XXXXXXXX) → on normalise.
-                    'phoneNumber' => KpayService::normalizeMsisdn($validated['phone_number']),
+                    'amount' => $amountForKpay,
+                    'provider' => $operator,
+                    'country' => $countryCode,
+                    // KPay exige le format international ; on préfixe l'indicatif
+                    // du pays (mobile saisit un numéro local).
+                    'phoneNumber' => KpayService::normalizeMsisdn($validated['phone_number'], $country['dial']),
                     'externalId' => $transaction->transaction_id,
                 ]);
 
@@ -233,6 +284,9 @@ class SubscriptionPaymentController extends Controller
                         'kpay_id' => $kpayId,
                         'kpay_reference' => $kpayHumanRef,
                         'kpay_operator' => $validated['mobile_operator'],
+                        'kpay_country' => $countryCode,
+                        'kpay_currency' => $localCurrency,
+                        'kpay_amount_local' => $amountForKpay,
                     ]),
                 ]);
 
@@ -756,6 +810,35 @@ class SubscriptionPaymentController extends Controller
         $this->checkFreeMoPayStatus($reference);
 
         return response()->json(['message' => 'Webhook processed']);
+    }
+
+    /**
+     * Pays & opérateurs KPay supportés (pour le sélecteur mobile).
+     * GET /api/subscription-payment/kpay/countries
+     */
+    public function kpayCountries()
+    {
+        $countries = [];
+
+        foreach ((array) config('kpay.countries', []) as $iso => $c) {
+            $operators = [];
+            foreach (($c['operators'] ?? []) as $op) {
+                $operators[] = [
+                    'code' => $op['code'],
+                    'label' => $op['label'] ?? $op['code'],
+                    'currency' => $op['currency'] ?? null,
+                ];
+            }
+            $countries[] = [
+                'code' => $iso,
+                'name' => $c['name'],
+                'flag' => $c['flag'] ?? null,
+                'dial_code' => $c['dial'],
+                'operators' => $operators,
+            ];
+        }
+
+        return response()->json(['success' => true, 'data' => $countries]);
     }
 
     /**

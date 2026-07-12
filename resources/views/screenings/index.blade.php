@@ -14,16 +14,7 @@
     </a>
 </div>
 
-@if(session('success'))
-<div class="mb-6 bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-green-300">
-    <i class="fas fa-check-circle mr-2"></i> {{ session('success') }}
-</div>
-@endif
-@if(session('error'))
-<div class="mb-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-300">
-    <i class="fas fa-exclamation-circle mr-2"></i> {{ session('error') }}
-</div>
-@endif
+{{-- Flash affiché par le layout admin (pas de doublon ici). --}}
 
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
@@ -128,7 +119,8 @@
                             </a>
                             @if($s->status !== 'canceled')
                             <form action="{{ route('screenings.cancel', $s) }}" method="POST"
-                                  onsubmit="return confirm('Annuler cette séance ? Elle ne sera plus réservable.');">
+                                  data-confirm="Annuler cette séance ? Elle ne sera plus réservable."
+                                  data-confirm-type="warning" data-confirm-title="Annuler la séance" data-confirm-confirm="Annuler la séance">
                                 @csrf
                                 <button type="submit" title="Annuler"
                                         class="bg-yellow-500/20 hover:bg-yellow-500 text-yellow-400 hover:text-white px-3 py-2 rounded-lg transition">
@@ -137,7 +129,8 @@
                             </form>
                             @endif
                             <form action="{{ route('screenings.destroy', $s) }}" method="POST"
-                                  onsubmit="return confirm('Supprimer définitivement cette séance ?');">
+                                  data-confirm="Supprimer définitivement cette séance ?"
+                                  data-confirm-type="danger" data-confirm-title="Supprimer la séance" data-confirm-confirm="Supprimer">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" title="Supprimer"

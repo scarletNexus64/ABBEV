@@ -51,7 +51,10 @@ class ReservationPaymentController extends Controller
             'quantity'        => 'required|integer|min:1|max:20',
             'payment_method'  => 'required|in:paypal,kpay,stripe',
             'phone_number'    => 'required_if:payment_method,kpay|string',
-            'mobile_operator' => 'required_if:payment_method,kpay|in:MTN_MONEY,ORANGE_MONEY',
+            // Opérateur du catalogue multi-pays (ex. MTN_MOMO_CMR, ORANGE_CIV…)
+            // ou ancien code legacy (MTN_MONEY/ORANGE_MONEY).
+            'mobile_operator' => 'required_if:payment_method,kpay|string',
+            'country_code'    => 'nullable|string|size:2',
         ]);
 
         $user       = $request->user();
@@ -192,9 +195,32 @@ class ReservationPaymentController extends Controller
      */
     private function initiateKpay(Transaction $transaction, Reservation $reservation, array $validated)
     {
+        // Pays du paiement : fourni, sinon pays du compte, sinon Cameroun.
+        // Résolu depuis config/kpay.php (catalogue multi-pays). L'opérateur
+        // est validé contre ce pays. Le montant du ticket est déjà en devise
+        // LOCALE fixe du cinéma → on ne convertit pas (contrairement aux
+        // abonnements dont le prix est en base XOF).
+        $countryCode = strtoupper($validated['country_code']
+            ?? $reservation->user?->country_code
+            ?? 'CM');
+        $country = config('kpay.countries.' . $countryCode);
+        $operator = $validated['mobile_operator'];
+
+        if ($country) {
+            $operatorEntry = collect($country['operators'])->firstWhere('code', $operator);
+            if (! $operatorEntry) {
+                $this->reservations->cancel($reservation);
+                return response()->json([
+                    'success' => false,
+                    'message' => "Cet opérateur n'est pas disponible pour {$country['name']}.",
+                ], 422);
+            }
+        }
+
         $result = $this->kpay->initPayment([
             'amount'        => (int) $transaction->amount,
-            'provider'      => $validated['mobile_operator'],
+            'provider'      => $operator,
+            'country'       => $countryCode,
             'phoneNumber'   => $validated['phone_number'],
             'externalId'    => $transaction->transaction_id,
         ]);

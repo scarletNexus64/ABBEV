@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Configuration;
+use App\Models\Currency;
 use App\Models\Transaction;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -134,7 +135,12 @@ class NowPaymentsService
             ];
         }
 
-        $amountUsd = round($amountXaf / max($this->exchangeRate, 1), 2);
+        // Conversion au taux LIVE (currencies.rate_from_xof) ; repli sur le
+        // taux fixe configurable si USD absent de la table.
+        $usdRate = Currency::rateFromXof('USD');
+        $amountUsd = ($usdRate !== null && $usdRate > 0)
+            ? round($amountXaf * $usdRate, 2)
+            : round($amountXaf / max($this->exchangeRate, 1), 2);
 
         $callbackUrl = $this->ipnCallbackUrl();
 

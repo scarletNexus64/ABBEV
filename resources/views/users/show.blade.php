@@ -5,22 +5,63 @@
 
 @section('content')
 <!-- Back Button + actions -->
-<div class="mb-6 flex items-center justify-between">
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
     <a href="{{ route('users.index') }}" class="inline-flex items-center text-primary-400 hover:text-primary-300 transition">
         <i class="fas fa-arrow-left mr-2"></i> Retour à la liste
     </a>
 
-    @if($user->id !== auth()->id() && $user->role === 'user')
-    <form action="{{ route('users.destroy', $user) }}" method="POST"
-          onsubmit="return confirm('Supprimer définitivement l\'utilisateur « {{ $user->name }} » ({{ $user->email }}) ?\n\nCette action est irréversible et supprimera toutes ses données associées.');">
-        @csrf
-        @method('DELETE')
-        <button type="submit"
-                class="bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white px-4 py-2 rounded-lg text-sm transition">
-            <i class="fas fa-trash mr-1"></i> Supprimer cet utilisateur
-        </button>
-    </form>
-    @endif
+    <div class="flex flex-wrap items-center gap-2">
+        @can('update', $user)
+        <a href="{{ route('users.edit', $user) }}"
+           class="bg-primary-500/20 hover:bg-primary-500 text-primary-400 hover:text-white px-4 py-2 rounded-lg text-sm transition">
+            <i class="fas fa-pen mr-1"></i> Modifier
+        </a>
+        @endcan
+
+        @can('updateStatus', $user)
+        <form action="{{ route('users.status', $user) }}" method="POST"
+              data-confirm="{{ $user->is_active ? 'Suspendre' : 'Réactiver' }} le compte de « {{ $user->name }} » ?"
+              data-confirm-type="{{ $user->is_active ? 'warning' : 'primary' }}"
+              data-confirm-confirm="{{ $user->is_active ? 'Suspendre' : 'Réactiver' }}">
+            @csrf @method('PATCH')
+            <input type="hidden" name="is_active" value="{{ $user->is_active ? 0 : 1 }}">
+            @if($user->is_active)
+            <button type="submit" class="bg-amber-500/20 hover:bg-amber-500 text-amber-400 hover:text-white px-4 py-2 rounded-lg text-sm transition">
+                <i class="fas fa-ban mr-1"></i> Suspendre
+            </button>
+            @else
+            <button type="submit" class="bg-green-500/20 hover:bg-green-500 text-green-400 hover:text-white px-4 py-2 rounded-lg text-sm transition">
+                <i class="fas fa-circle-check mr-1"></i> Réactiver
+            </button>
+            @endif
+        </form>
+        @endcan
+
+        @can('resetPassword', $user)
+        <form action="{{ route('users.resetPassword', $user) }}" method="POST"
+              data-confirm="Régénérer le mot de passe de « {{ $user->name }} » et le lui envoyer par email ?"
+              data-confirm-type="primary" data-confirm-confirm="Réinitialiser">
+            @csrf
+            <button type="submit" class="bg-sky-500/20 hover:bg-sky-500 text-sky-400 hover:text-white px-4 py-2 rounded-lg text-sm transition">
+                <i class="fas fa-key mr-1"></i> Réinit. mot de passe
+            </button>
+        </form>
+        @endcan
+
+        @can('delete', $user)
+        @if($user->role === 'user')
+        <form action="{{ route('users.destroy', $user) }}" method="POST"
+              data-confirm="Supprimer définitivement l'utilisateur « {{ $user->name }} » ({{ $user->email }}) ? Cette action est irréversible et supprimera toutes ses données associées."
+              data-confirm-type="danger" data-confirm-title="Supprimer l'utilisateur" data-confirm-confirm="Supprimer">
+            @csrf @method('DELETE')
+            <button type="submit"
+                    class="bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white px-4 py-2 rounded-lg text-sm transition">
+                <i class="fas fa-trash mr-1"></i> Supprimer
+            </button>
+        </form>
+        @endif
+        @endcan
+    </div>
 </div>
 
 <!-- User Info Card -->
@@ -44,6 +85,16 @@
                 @else
                 <span class="bg-gray-500/20 text-gray-400 px-3 py-1 rounded-full text-sm">
                     <i class="fas fa-times-circle mr-1"></i> Non abonné
+                </span>
+                @endif
+
+                @if($user->is_active)
+                <span class="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm">
+                    <i class="fas fa-circle-check mr-1"></i> Actif
+                </span>
+                @else
+                <span class="bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-sm">
+                    <i class="fas fa-ban mr-1"></i> Suspendu
                 </span>
                 @endif
             </div>
@@ -116,6 +167,27 @@
             </div>
         </div>
     </div>
+
+    @can('manageSubscription', $user)
+    <div class="mt-4 flex flex-wrap items-center gap-3">
+        <form action="{{ route('users.subscription.extend', $user) }}" method="POST" class="flex items-center gap-2">
+            @csrf
+            <input type="number" name="days" min="1" max="3650" value="30"
+                   class="w-24 bg-dark-50 border border-dark-200 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500">
+            <button type="submit" class="bg-primary-500/20 hover:bg-primary-500 text-primary-400 hover:text-white px-4 py-2 rounded-lg text-sm transition">
+                <i class="fas fa-clock mr-1"></i> Prolonger (jours)
+            </button>
+        </form>
+        <form action="{{ route('users.subscription.cancel', [$user, $activeSubscription]) }}" method="POST"
+              data-confirm="Annuler l'abonnement actif de « {{ $user->name }} » ? Son accès sera révoqué."
+              data-confirm-type="danger" data-confirm-title="Annuler l'abonnement" data-confirm-confirm="Annuler l'abonnement">
+            @csrf @method('DELETE')
+            <button type="submit" class="bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white px-4 py-2 rounded-lg text-sm transition">
+                <i class="fas fa-xmark mr-1"></i> Annuler l'abonnement
+            </button>
+        </form>
+    </div>
+    @endcan
 </div>
 @endif
 

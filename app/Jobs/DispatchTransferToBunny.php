@@ -104,14 +104,15 @@ class DispatchTransferToBunny implements ShouldQueue
                 $upload->update(['status' => 'transferring']);
             }
 
-            if (! $upload->temp_path || ! is_file($upload->temp_path)) {
-                throw new \RuntimeException("Fichier temporaire absent : {$upload->temp_path}");
+            $source = $upload->localFilePath();
+            if (! $source) {
+                throw new \RuntimeException("Fichier local absent (temp_path et copie publique introuvables).");
             }
 
             $lastPersist = 0;
             $bunny->uploadVideoStream(
                 $upload->bunny_guid,
-                $upload->temp_path,
+                $source,
                 function (int $sent, int $total) use ($upload, &$lastPersist) {
                     $now = time();
                     if ($now - $lastPersist >= 2) { // throttle : 1 écriture / 2 s max
@@ -268,8 +269,11 @@ class DispatchTransferToBunny implements ShouldQueue
         $ext  = strtolower(pathinfo($upload->original_filename, PATHINFO_EXTENSION)) ?: 'mp4';
         $name = $upload->id . '_' . Str::random(8) . '.' . $ext;
 
-        $destDir      = Storage::disk('public')->path('uploads');
-        $relativePath = 'uploads/' . $name;
+        // Disque PRIVÉ (storage/app/private) : jamais accessible directement via
+        // le web. Les vidéos locales ne sont servies que par une URL signée
+        // (LocalVideoStreamController) après vérification de l'abonnement.
+        $destDir      = Storage::disk('local')->path('videos');
+        $relativePath = 'videos/' . $name;
         $absolutePath = $destDir . DIRECTORY_SEPARATOR . $name;
 
         if (! is_dir($destDir)) {
@@ -297,6 +301,17 @@ class DispatchTransferToBunny implements ShouldQueue
         ]);
 
         Cache::forget('bunny.videos.all'); // dispo immédiate dans le picker (local)
+
+        // Conversion MP4 (H.264/AAC) DÉCOUPLÉE : une vidéo .webm ne se lit ni sur
+        // iOS ni sur Safari. On la convertit sur une file séparée « transcode »
+        // pour ne PAS bloquer ce worker (ni les transferts des autres users)
+        // pendant les minutes d'encodage ffmpeg. La vidéo est déjà « dispo en
+        // local » ci-dessus ; le MP4 iPhone la remplacera dès l'encodage fini.
+        // ffmpeg écrit un nouveau fichier et ne supprime l'original qu'à la fin :
+        // un PUT Bunny en cours (file bunny) n'est pas gêné.
+        if (\App\Services\VideoTranscoder::needsTranscode($absolutePath)) {
+            TranscodeBunnyUpload::dispatch($upload->id);
+        }
     }
 
     /**
@@ -333,7 +348,7 @@ class DispatchTransferToBunny implements ShouldQueue
      */
     protected function deleteServerFile(BunnyUpload $upload): void
     {
-        foreach ([$upload->temp_path, $upload->local_path ? public_path('storage/' . $upload->local_path) : null] as $path) {
+        foreach ([$upload->temp_path, $upload->local_path ? Storage::disk('local')->path($upload->local_path) : null] as $path) {
             if ($path && is_file($path)) {
                 @unlink($path);
             }

@@ -72,6 +72,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | ExchangeRate-API (taux de change live des devises)
+    |--------------------------------------------------------------------------
+    | Alimente currencies.rate_from_xof via `php artisan rates:update` (planifié
+    | quotidiennement). Base = XOF (devise de référence de la plateforme).
+    | Clé : https://www.exchangerate-api.com/ (plan gratuit ~1 maj/jour).
+    */
+    'exchangerate' => [
+        'key'  => env('EXCHANGERATE_API_KEY', ''),
+        'base' => env('EXCHANGERATE_BASE', 'XOF'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Apple App Store Server API (In-App Purchase — abonnement auto-renouvelable)
     |--------------------------------------------------------------------------
     | Sert à vérifier les transactions StoreKit côté serveur et à traiter les
@@ -87,6 +100,19 @@ return [
         'private_key' => env('APPLE_IAP_PRIVATE_KEY'),
         'key_path'    => env('APPLE_IAP_KEY_PATH'),
         'sandbox'     => (bool) env('APPLE_IAP_SANDBOX', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | ffmpeg (transcodage des vidéos locales vers MP4 H.264/AAC)
+    |--------------------------------------------------------------------------
+    | Les vidéos uploadées en .webm (ou autre) sont converties en .mp4 pour
+    | une lecture universelle sur mobile (iOS/Android) et hors-ligne.
+    | Requiert le binaire ffmpeg installé sur le serveur.
+    */
+    'ffmpeg' => [
+        'bin'     => env('FFMPEG_BIN', 'ffmpeg'),
+        'timeout' => (int) env('FFMPEG_TIMEOUT', 7200),
     ],
 
 ];

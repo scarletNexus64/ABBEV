@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Concerns\HasObfuscatedRouteKey;
+use App\Notifications\AdminResetPasswordNotification;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -12,10 +14,19 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, HasObfuscatedRouteKey, Notifiable;
 
     /**
-     * Rôles disponibles : 'admin' | 'producer' | 'user'.
+     * Email de réinitialisation de mot de passe : version française brandée
+     * ABBEV, pointant vers le dashboard web (admin.password.reset).
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new AdminResetPasswordNotification($token));
+    }
+
+    /**
+     * Rôles disponibles : 'admin' | 'producer' | 'assistant' | 'user'.
      */
     public function isAdmin(): bool
     {
@@ -28,10 +39,20 @@ class User extends Authenticatable
         return $this->role === 'producer';
     }
 
-    /** Membre du panel (admin ou producteur) : a accès au dashboard. */
+    /**
+     * Assistant (direction artistique) : valide/rejette les contenus et leur
+     * attribue catégorie + tier. Accès au panel de modération, mais pas à la
+     * gestion (users, forfaits, config…) réservée à l'admin.
+     */
+    public function isAssistant(): bool
+    {
+        return $this->role === 'assistant';
+    }
+
+    /** Membre du panel (admin, producteur ou assistant) : a accès au dashboard. */
     public function isStaff(): bool
     {
-        return in_array($this->role, ['admin', 'producer'], true);
+        return in_array($this->role, ['admin', 'producer', 'assistant'], true);
     }
 
     /** Contenus (films/séries) dont cet utilisateur est propriétaire. */
@@ -48,8 +69,12 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone',
+        'phone_verified_at',
+        'avatar_path',
         'password',
         'role',
+        'is_active',
         'country_code',
         'currency_code',
     ];
@@ -73,7 +98,9 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'phone_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 

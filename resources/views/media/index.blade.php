@@ -135,7 +135,8 @@
                                 Modifier
                             </a>
                             <form action="{{ route('media.destroy', $item) }}" method="POST" class="flex-1"
-                                  onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette série ?');">
+                                  data-confirm="Supprimer cette série ? Cette action est irréversible."
+                                  data-confirm-type="danger" data-confirm-title="Supprimer la série" data-confirm-confirm="Supprimer">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit"
@@ -153,7 +154,8 @@
                             Modifier
                         </a>
                         <form action="{{ route('media.destroy', $item) }}" method="POST" class="flex-1"
-                              onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce film ?');">
+                              data-confirm="Supprimer ce film ? Cette action est irréversible."
+                              data-confirm-type="danger" data-confirm-title="Supprimer le film" data-confirm-confirm="Supprimer">
                             @csrf
                             @method('DELETE')
                             <button type="submit"

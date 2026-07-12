@@ -129,7 +129,7 @@
                     @forelse($uploads as $u)
                         @php
                             $meta       = $statusMeta[$u->status] ?? ['—', 'bg-gray-500/15 text-gray-300 border-gray-500/30', 'fa-circle'];
-                            $hasFile    = $u->temp_path && is_file($u->temp_path);
+                            $hasFile    = $u->localFilePath() !== null;
                             $localReady = $u->hasLocalCopy();
                             $inProgress = in_array($u->status, ['uploading','transferring','processing'], true);
 
@@ -164,9 +164,19 @@
                                     </div>
                                     <div class="min-w-0">
                                         <p class="text-white truncate max-w-xs" title="{{ $u->title }}">{{ $u->title }}</p>
-                                        <div class="flex items-center gap-2 mt-0.5">
-                                            @if($localReady)
+                                        <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+                                            @php $isMp4 = \Illuminate\Support\Str::endsWith(\Illuminate\Support\Str::lower((string) $u->local_path), ['.mp4', '.m4v']); @endphp
+                                            @if($localReady && $isMp4)
+                                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-300 border border-green-500/25"
+                                                      title="MP4 H.264 — lisible partout : Android, iPhone, Safari, Web.">
+                                                    <i class="fab fa-apple"></i> Dispo iPhone ✓
+                                                </span>
+                                            @elseif($localReady)
                                                 <span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-300 border border-green-500/25">LOCAL · dispo picker</span>
+                                                <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25"
+                                                      title="Format {{ strtoupper(pathinfo($u->local_path, PATHINFO_EXTENSION)) }} : non lisible sur iPhone/Safari. Conversion MP4 en cours (worker bunny).">
+                                                    <i class="fas fa-triangle-exclamation"></i> {{ strtoupper(pathinfo($u->local_path, PATHINFO_EXTENSION)) }} · iOS ✗
+                                                </span>
                                             @endif
                                         </div>
                                     </div>
@@ -193,7 +203,7 @@
                             <td class="px-4 py-3" data-cell="actions">
                                 <div class="flex items-center justify-end gap-1.5">
                                     @if($localReady)
-                                        <a href="{{ asset('storage/' . $u->local_path) }}" target="_blank" title="Lire en local"
+                                        <a href="{{ route('admin.bunny.uploads.stream', $u->id) }}" target="_blank" title="Lire en local"
                                            class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-dark-200 hover:bg-dark-300 text-green-300"><i class="fas fa-play text-xs"></i></a>
                                     @endif
                                     @if($hasFile)
@@ -379,15 +389,18 @@
         if(finished) scheduleReload();
     }, sig);
 
+    // Notification non bloquante (toast ABBEV), avec repli minimal si absent.
+    const toast=(m,t)=>{ if(window.ABBEV&&ABBEV.toast) ABBEV.toast(m,t); else console.log('['+(t||'info')+'] '+m); };
+
     /* ---------- Relancer ---------- */
     async function retryUpload(id){
         try{
             const r=await fetch(`${URL_BASE}/${id}/retry`,{method:'POST',headers:{'X-CSRF-TOKEN':CSRF,'Accept':'application/json'}});
             const d=await r.json();
-            if(!r.ok){alert(d.error||'Relance impossible.');return;}
+            if(!r.ok){toast(d.error||'Relance impossible.','error');return;}
             if(engine) engine.ensurePolling();
             scheduleReload();
-        }catch(e){alert('Erreur réseau à la relance.');}
+        }catch(e){toast('Erreur réseau à la relance.','error');}
     }
     document.addEventListener('click',(e)=>{const b=e.target.closest('[data-retry-row]'); if(b) retryUpload(b.dataset.retryRow);}, sig);
 
@@ -416,8 +429,13 @@
     }
     function afterDelete(d){
         closeDelModal();
+        // Toast récap : les non-supprimées (rattachées à un film/épisode) sont
+        // signalées en toast « info » persistant, plus d'alert() bloquant.
         if(d.skipped&&d.skipped.length){
-            alert(`${d.deleted} supprimée(s).\nNon supprimée(s) :\n`+d.skipped.map(s=>`• ${s.title} — ${s.reason}`).join('\n'));
+            const lignes=d.skipped.map(s=>'• '+s.title+' — '+s.reason).join('\n');
+            toast((d.deleted?d.deleted+' supprimée(s). ':'')+'Non supprimée(s) :\n'+lignes,'info');
+        } else if(d.deleted){
+            toast(d.deleted+' vidéo(s) supprimée(s).','success');
         }
         if(window.ABBEV&&ABBEV.navigate) ABBEV.navigate(location.href);
         else location.reload();
@@ -426,7 +444,7 @@
         if(!pendingIds.length) return;
         delConfirm.disabled=true; delConfirm.innerHTML='<i class="fas fa-spinner fa-spin mr-1.5"></i>Suppression…';
         try{afterDelete(await deleteIds(pendingIds));}
-        catch(d){closeDelModal(); alert(d.message||'Suppression impossible.');}
+        catch(d){closeDelModal(); toast(d.message||'Suppression impossible.','error');}
     },sig);
 
     document.addEventListener('click',(e)=>{const b=e.target.closest('[data-del-row]'); if(b) openDelModal([Number(b.dataset.delRow)]);},sig);
@@ -464,7 +482,7 @@
 
     // Flash après suppression
     const delMsg=sessionStorage.getItem('bunny-del-msg');
-    if(delMsg){sessionStorage.removeItem('bunny-del-msg'); setTimeout(()=>alert(delMsg),150);}
+    if(delMsg){sessionStorage.removeItem('bunny-del-msg'); setTimeout(()=>toast(delMsg,'info'),150);}
 
     refreshSel();
 })();

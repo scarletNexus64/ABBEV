@@ -54,7 +54,8 @@
                                 Ajouter un Épisode
                             </a>
                             <form action="{{ route('episodes.season.destroy', $season) }}" method="POST"
-                                  onsubmit="return confirm('Supprimer cette saison et tous ses épisodes ?')">
+                                  data-confirm="Supprimer cette saison et tous ses épisodes ?"
+                                  data-confirm-type="danger" data-confirm-title="Supprimer la saison" data-confirm-confirm="Supprimer">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-all">
@@ -79,7 +80,8 @@
                                                 <i class="fas fa-edit"></i>
                                             </a>
                                             <form action="{{ route('episodes.destroy', $episode) }}" method="POST"
-                                                  onsubmit="return confirm('Supprimer cet épisode ?')" class="inline">
+                                                  data-confirm="Supprimer cet épisode ?"
+                                                  data-confirm-type="danger" data-confirm-confirm="Supprimer" class="inline">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="text-gray-400 hover:text-red-500 transition-colors">

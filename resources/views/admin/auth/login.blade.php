@@ -639,6 +639,10 @@
                         <input type="checkbox" id="remember" name="remember">
                         <label for="remember">Se souvenir de moi</label>
                     </div>
+                    <a href="{{ route('admin.password.request') }}"
+                       style="color: var(--primary); font-size: 0.9rem; font-weight: 500; text-decoration: none;">
+                        Mot de passe oublié ?
+                    </a>
                 </div>
 
                 <button type="submit" class="btn-login">

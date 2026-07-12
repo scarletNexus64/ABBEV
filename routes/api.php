@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CategoryApiController;
 use App\Http\Controllers\Api\CryptoPaymentController;
 use App\Http\Controllers\Api\EpisodeApiController;
 use App\Http\Controllers\Api\LocaleApiController;
+use App\Http\Controllers\Api\LocalVideoStreamController;
 use App\Http\Controllers\Api\MediaApiController;
 use App\Http\Controllers\Api\MyListApiController;
 use App\Http\Controllers\Api\ReservationPaymentController;
@@ -29,6 +30,12 @@ Route::prefix('v1')->group(function () {
         // Login / inscription par OTP email
         Route::post('/send-otp',   [AuthApiController::class, 'sendOtp']);
         Route::post('/verify-otp', [AuthApiController::class, 'verifyOtp']);
+
+        // Mot de passe oublié : code par email → vérification → nouveau mot de passe.
+        Route::post('/forgot-password',   [AuthApiController::class, 'forgotPassword'])
+            ->middleware('throttle:6,1');
+        Route::post('/verify-reset-code', [AuthApiController::class, 'verifyResetCode']);
+        Route::post('/reset-password',    [AuthApiController::class, 'resetPassword']);
 
         Route::middleware('auth:sanctum')->group(function () {
             Route::get('/me',         [AuthApiController::class, 'me']);
@@ -123,6 +130,14 @@ Route::prefix('v1')->group(function () {
         });
     });
 
+    // Streaming des vidéos LOCALES via URL SIGNÉE (générée par /watch après
+    // vérification de l'abonnement). La signature (+ expiration) EST le
+    // contrôle d'accès — plus de lien public permanent partageable.
+    Route::get('/watch/local/{type}/{id}', LocalVideoStreamController::class)
+        ->middleware('signed')
+        ->where('type', 'movie|episode')
+        ->name('api.watch.local');
+
     // -------------------------------------------------------------
     // PUBLIC — catégories / recherche / featured global
     // -------------------------------------------------------------
@@ -171,6 +186,8 @@ Route::middleware('auth:sanctum')->prefix('subscription-payment')->group(functio
 
     // KPay — paiement
     Route::get('/kpay/status/{reference}', [SubscriptionPaymentController::class, 'checkKpayStatus']);
+    // KPay — pays & opérateurs supportés (pour le sélecteur mobile).
+    Route::get('/kpay/countries', [SubscriptionPaymentController::class, 'kpayCountries']);
 
     // Apple In-App Purchase (iOS) — vérification d'un achat StoreKit.
     Route::post('/apple/verify', [SubscriptionPaymentController::class, 'verifyApple']);

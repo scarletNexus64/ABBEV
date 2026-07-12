@@ -61,7 +61,8 @@
                         <div class="flex items-center justify-center gap-2">
                             @if($admin->id !== auth()->id())
                             <form action="{{ route('administrators.destroy', $admin) }}" method="POST"
-                                  onsubmit="return confirm('Êtes-vous sûr de vouloir retirer les droits administrateur à {{ $admin->name }} ?');">
+                                  data-confirm="Retirer les droits administrateur à {{ $admin->name }} ?"
+                                  data-confirm-type="danger" data-confirm-title="Retirer l'administrateur" data-confirm-confirm="Retirer">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit"

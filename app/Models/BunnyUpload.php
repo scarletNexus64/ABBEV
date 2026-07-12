@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Suivi d'un upload de vidéo vers la Bunny Library.
@@ -72,10 +73,31 @@ class BunnyUpload extends Model
         return in_array($this->status, self::TERMINAL, true);
     }
 
-    /** Une copie locale lisible existe-t-elle (fallback de test) ? */
+    /**
+     * Une copie locale lisible existe-t-elle ? On teste le fichier via le disque
+     * « public » (canonique) et pas via public_path()/symlink, qui peut échouer
+     * selon l'environnement même quand le fichier existe bel et bien.
+     */
     public function hasLocalCopy(): bool
     {
-        return (bool) ($this->local_path && is_file(public_path('storage/' . $this->local_path)));
+        return (bool) ($this->local_path && Storage::disk('local')->exists($this->local_path));
+    }
+
+    /**
+     * Chemin absolu du fichier local utilisable (pour download / transfert Bunny).
+     * Préfère temp_path s'il existe encore, sinon retombe sur la copie publique
+     * (local_path). Retourne null si aucune copie locale n'est disponible.
+     */
+    public function localFilePath(): ?string
+    {
+        if ($this->temp_path && is_file($this->temp_path)) {
+            return $this->temp_path;
+        }
+        if ($this->local_path && Storage::disk('local')->exists($this->local_path)) {
+            return Storage::disk('local')->path($this->local_path);
+        }
+
+        return null;
     }
 
     public function markFailed(string $message): void

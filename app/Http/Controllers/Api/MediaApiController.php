@@ -29,9 +29,7 @@ class MediaApiController extends Controller
     // ============================================================
     public function index(Request $request): JsonResponse
     {
-        $q = Media::with('category')->where(function ($x) {
-            $x->whereNull('published_at')->orWhere('published_at', '<=', now());
-        });
+        $q = Media::with('category')->published();
 
         if ($request->filled('type')) {
             $q->where('type', $request->type);
@@ -122,6 +120,7 @@ class MediaApiController extends Controller
     public function movieShow(Media $movie): JsonResponse
     {
         abort_if($movie->type !== 'movie', 404);
+        abort_unless($movie->isApproved(), 404); // contenu en modération invisible
         $movie->load('category');
         $movie->increment('views_count');
 
@@ -179,6 +178,7 @@ class MediaApiController extends Controller
     public function serieShow(Media $series): JsonResponse
     {
         abort_if($series->type !== 'series', 404);
+        abort_unless($series->isApproved(), 404); // contenu en modération invisible
         $series->load(['category', 'seasonsRelation.episodes']);
         $series->increment('views_count');
 
@@ -213,9 +213,7 @@ class MediaApiController extends Controller
     {
         $items = Media::with('category')
             ->where('category_id', $category->id)
-            ->where(function ($q) {
-                $q->whereNull('published_at')->orWhere('published_at', '<=', now());
-            })
+            ->published()
             ->orderByDesc('published_at')
             ->paginate($request->get('per_page', 20));
 
@@ -235,10 +233,7 @@ class MediaApiController extends Controller
         $q = (string) $request->get('q', $request->get('query', ''));
         $type = $request->get('type');
 
-        $base = Media::with('category')
-            ->where(function ($x) {
-                $x->whereNull('published_at')->orWhere('published_at', '<=', now());
-            });
+        $base = Media::with('category')->published();
         if ($q !== '') {
             $base->where(function ($x) use ($q) {
                 $x->where('title', 'like', "%{$q}%")->orWhere('description', 'like', "%{$q}%");
@@ -260,9 +255,7 @@ class MediaApiController extends Controller
     {
         $items = Media::with('category')
             ->where('is_featured', true)
-            ->where(function ($q) {
-                $q->whereNull('published_at')->orWhere('published_at', '<=', now());
-            })
+            ->published()
             ->orderByDesc('published_at')
             ->limit(20)
             ->get();
@@ -280,9 +273,7 @@ class MediaApiController extends Controller
     {
         $media = Media::with(['category', 'seasonsRelation.episodes'])
             ->where('slug', $slug)
-            ->where(function ($q) {
-                $q->whereNull('published_at')->orWhere('published_at', '<=', now());
-            })
+            ->published()
             ->firstOrFail();
 
         $media->increment('views_count');
@@ -301,9 +292,7 @@ class MediaApiController extends Controller
     {
         $q = Media::with('category')
             ->where('type', 'movie')
-            ->where(function ($qq) {
-                $qq->whereNull('published_at')->orWhere('published_at', '<=', now());
-            });
+            ->published();
         if ($request->filled('category_id')) {
             $q->where('category_id', $request->category_id);
         }
@@ -319,9 +308,7 @@ class MediaApiController extends Controller
     {
         $q = Media::with(['category', 'seasonsRelation'])
             ->where('type', 'series')
-            ->where(function ($qq) {
-                $qq->whereNull('published_at')->orWhere('published_at', '<=', now());
-            });
+            ->published();
         if ($request->filled('category_id')) {
             $q->where('category_id', $request->category_id);
         }

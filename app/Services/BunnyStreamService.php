@@ -46,6 +46,24 @@ class BunnyStreamService
         return $this->libraryId !== '' && $this->apiKey !== '' && $this->cdnHostname !== '';
     }
 
+    /**
+     * Test de connectivité : un appel authentifié léger à la library.
+     * Renvoie le code HTTP (200 = OK, 401/403 = clé invalide, 404 = library
+     * introuvable) sans lever d'exception, pour la page de configuration.
+     *
+     * @return array{ok: bool, status: int|null, message: string|null}
+     */
+    public function ping(): array
+    {
+        try {
+            $resp = $this->api()->get("/library/{$this->libraryId}/videos", ['itemsPerPage' => 1]);
+
+            return ['ok' => $resp->successful(), 'status' => $resp->status(), 'message' => null];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'status' => null, 'message' => $e->getMessage()];
+        }
+    }
+
     /* ---------------------------------------------------------------
      |  API management (auth via AccessKey header)
      * --------------------------------------------------------------- */

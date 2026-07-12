@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Concerns\HasObfuscatedRouteKey;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Screening extends Model
 {
-    use HasFactory;
+    use HasFactory, HasObfuscatedRouteKey;
 
     protected $fillable = [
         'media_id',

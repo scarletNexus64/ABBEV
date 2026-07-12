@@ -44,16 +44,7 @@
         </div>
     </div>
 
-    @if (session('success'))
-        <div class="bg-green-500/10 border border-green-500/30 text-green-300 rounded-lg p-4">
-            <i class="fas fa-check-circle mr-2"></i>{{ session('success') }}
-        </div>
-    @endif
-    @if (session('error'))
-        <div class="bg-red-500/10 border border-red-500/30 text-red-300 rounded-lg p-4">
-            <i class="fas fa-exclamation-triangle mr-2"></i>{{ session('error') }}
-        </div>
-    @endif
+    {{-- Flash affiché par le layout admin (pas de doublon ici). --}}
 
     <!-- Recherche locale -->
     <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-4">

@@ -39,10 +39,11 @@
             <div class="flex items-start gap-3">
                 <i class="fas fa-key text-primary-400 text-xl mt-1"></i>
                 <div>
-                    <p class="text-primary-200 font-medium mb-1">Mot de passe généré automatiquement</p>
+                    <p class="text-primary-200 font-medium mb-1">Mot de passe généré et envoyé par email</p>
                     <p class="text-primary-100/80 text-sm">
-                        Un mot de passe fort sera créé et <span class="font-semibold">affiché une seule fois</span> après la
-                        création. Note-le bien pour le transmettre au producteur — il ne sera plus jamais visible ensuite.
+                        Un mot de passe fort sera créé puis <span class="font-semibold">envoyé automatiquement</span> au
+                        producteur à l'adresse ci-dessus. En cas d'échec d'envoi, il te sera affiché une seule fois pour
+                        que tu le transmettes à la main.
                     </p>
                 </div>
             </div>
@@ -52,7 +53,9 @@
             <button type="submit" class="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-lg transition flex-1">
                 <i class="fas fa-check mr-2"></i> Créer le producteur
             </button>
-            <a href="{{ route('producers.index') }}" class="bg-dark-200 hover:bg-dark-300 text-white px-6 py-3 rounded-lg transition text-center">
+            <a href="{{ route('producers.index') }}" class="bg-dark-200 hover:bg-dark-300 text-white px-6 py-3 rounded-lg transition text-center"
+               data-confirm="Annuler la création ? Les informations saisies seront perdues."
+               data-confirm-type="warning" data-confirm-title="Annuler la création" data-confirm-confirm="Oui, annuler">
                 <i class="fas fa-times mr-2"></i> Annuler
             </a>
         </div>

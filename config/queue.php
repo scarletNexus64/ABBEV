@@ -60,6 +60,23 @@ return [
             'after_commit' => false,
         ],
 
+        /*
+         * Connexion dédiée au TRANSCODAGE ffmpeg (webm/mkv… → MP4 iPhone).
+         * L'encodage est long (plusieurs minutes) et gourmand en CPU : on le
+         * sépare de la file « bunny » (transferts réseau) pour qu'un encodage
+         * ne bloque JAMAIS un transfert, et inversement. Chaque file a ses
+         * propres workers, dimensionnables indépendamment.
+         * Lancer le worker : php artisan queue:work transcode --queue=transcode --timeout=0
+         */
+        'transcode' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'transcode',
+            'retry_after' => (int) env('TRANSCODE_QUEUE_RETRY_AFTER', 7200),
+            'after_commit' => false,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

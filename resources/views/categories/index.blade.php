@@ -106,7 +106,8 @@
                         <i class="fas fa-edit"></i>
                     </a>
                     <form action="{{ route('categories.destroy', $category) }}" method="POST" class="inline"
-                          onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette catégorie ?');">
+                          data-confirm="Supprimer cette catégorie ?"
+                          data-confirm-type="danger" data-confirm-title="Supprimer la catégorie" data-confirm-confirm="Supprimer">
                         @csrf
                         @method('DELETE')
                         <button type="submit"

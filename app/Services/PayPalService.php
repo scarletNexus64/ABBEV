@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use App\Models\Configuration;
+use App\Models\Currency;
 
 class PayPalService
 {
@@ -113,8 +114,16 @@ class PayPalService
 
         try {
             $amountXaf = $params['amount'];
-            $exchangeRate = Configuration::getValue('paypal_exchange_rate', 655); // 1 USD = 655 XAF
-            $amountUsd = round($amountXaf / $exchangeRate, 2);
+            // Conversion au taux LIVE (currencies.rate_from_xof, alimenté par
+            // ExchangeRate-API). Repli sur le taux fixe configurable si la
+            // devise USD est absente de la table.
+            $usdRate = Currency::rateFromXof('USD'); // unités USD pour 1 XOF
+            if ($usdRate !== null && $usdRate > 0) {
+                $amountUsd = round($amountXaf * $usdRate, 2);
+            } else {
+                $exchangeRate = (float) Configuration::getValue('paypal_exchange_rate', 655);
+                $amountUsd = round($amountXaf / $exchangeRate, 2);
+            }
 
             Log::info('[PayPalService] Creating PayPal order...', [
                 'amount_xaf' => $amountXaf,

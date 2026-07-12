@@ -58,21 +58,31 @@
                     </div>
                 </template>
 
-                <input x-show="!selected" type="text" x-model="query" @input.debounce.300ms="refresh()"
-                       placeholder="🔍 Rechercher par nom — vidéos Bunny et locales…"
-                       class="w-full bg-dark-50 border border-dark-200 rounded-lg px-4 py-3 text-white" />
+                <div x-show="!selected" class="abbev-search">
+                    <input type="text" x-model="query" @input.debounce.300ms="refresh()"
+                           placeholder="Rechercher par nom — vidéos Bunny et locales…"
+                           class="w-full bg-dark-50 border border-dark-200 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition" />
+                    <i class="fas fa-magnifying-glass"></i>
+                </div>
 
-                <div x-show="!selected" class="mt-2 max-h-72 overflow-y-auto bg-dark-50 border border-dark-200 rounded-lg divide-y divide-dark-200">
+                <div x-show="!selected" class="abbev-scroll mt-3 max-h-72 overflow-y-auto bg-dark-50 border border-dark-200 rounded-xl p-2 space-y-1">
                     <template x-if="loading"><div class="p-4 text-gray-400 text-sm text-center"><i class="fas fa-spinner fa-spin mr-2"></i>Chargement…</div></template>
-                    <template x-if="!loading && results.length === 0"><div class="p-4 text-gray-500 text-sm text-center">Aucune vidéo libre. <a href="{{ route('admin.bunny.uploads.index') }}" class="text-primary-300 underline">Uploader une vidéo</a>.</div></template>
+                    <template x-if="!loading && results.length === 0"><div class="p-6 text-gray-500 text-sm text-center"><i class="fas fa-film text-2xl mb-2 block opacity-30"></i>Aucune vidéo libre. <a href="{{ route('admin.bunny.uploads.index') }}" class="text-primary-300 underline">Uploader une vidéo</a>.</div></template>
                     <template x-for="v in results" :key="v.guid">
-                        <button type="button" @click="selected = v" class="w-full text-left flex items-center gap-3 p-3 hover:bg-dark-200/50">
-                            <img :src="v.thumb" class="w-20 h-12 rounded object-cover bg-dark-300 flex-shrink-0" onerror="this.style.opacity=.2">
-                            <div class="flex-1 min-w-0">
-                                <p class="text-white text-sm truncate" x-text="v.title"></p>
-                                <p class="text-gray-500 text-xs font-mono truncate" x-text="v.guid"></p>
-                            </div>
-                            <span class="text-xs text-gray-400" x-text="formatDuration(v.length)"></span>
+                        <button type="button" @click="selected = v" class="abbev-pick-item">
+                            <span class="abbev-pick-thumb">
+                                <template x-if="v.thumb"><img :src="v.thumb" onerror="this.remove()"></template>
+                                <template x-if="!v.thumb"><i class="fas fa-film ph"></i></template>
+                            </span>
+                            <span class="flex-1 min-w-0">
+                                <span class="block text-white text-sm font-medium truncate" x-text="v.title"></span>
+                                <span class="block text-gray-500 text-xs font-mono truncate" x-text="v.guid"></span>
+                            </span>
+                            <span class="flex flex-col items-end gap-1 flex-shrink-0">
+                                <span x-show="String(v.guid).startsWith('local:')" class="abbev-badge-local"><i class="fas fa-hard-drive"></i> Local</span>
+                                <span x-show="!String(v.guid).startsWith('local:')" class="abbev-badge-bunny"><i class="fas fa-cloud"></i> Bunny</span>
+                                <span class="text-xs text-gray-400" x-text="formatDuration(v.length)"></span>
+                            </span>
                         </button>
                     </template>
                 </div>

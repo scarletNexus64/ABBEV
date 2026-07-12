@@ -33,22 +33,76 @@ class KpayService
     }
 
     /**
-     * Mappe un code opérateur interne (envoyé par le mobile) vers le code
-     * provider EXACT attendu par KPay (qui détermine pays + devise).
-     * ABBEV opère au Cameroun (XAF) → providers CMR.
+     * Repli legacy (Cameroun) si aucun pays n'est fourni : conserve le
+     * comportement d'origine pour ne rien casser.
      */
-    private const PROVIDER_MAP = [
+    private const LEGACY_PROVIDER_MAP = [
         'MTN_MONEY'    => 'MTN_MOMO_CMR',
         'ORANGE_MONEY' => 'ORANGE_CMR',
     ];
 
     /**
-     * Résout le code provider KPay à partir d'un opérateur interne. Si la
-     * valeur est déjà un code KPay (ou inconnue), on la renvoie telle quelle.
+     * Configuration d'un pays KPay (currency, dial, operators) depuis
+     * config/kpay.php, ou null si le pays n'est pas supporté.
+     *
+     * @return array{name:string,currency:string,dial:string,operators:array<string,string>}|null
      */
-    public function providerFor(string $operator): string
+    public function country(string $iso2): ?array
     {
-        return self::PROVIDER_MAP[$operator] ?? $operator;
+        return config('kpay.countries.' . strtoupper($iso2));
+    }
+
+    /**
+     * Opérateurs disponibles pour un pays : liste de
+     * `['code' => ..., 'label' => ..., 'currency' => ...]`.
+     *
+     * @return array<int,array{code:string,label:string,currency:string}>
+     */
+    public function operatorsFor(string $iso2): array
+    {
+        return $this->country($iso2)['operators'] ?? [];
+    }
+
+    /**
+     * Retrouve un opérateur d'un pays par son code provider KPay.
+     *
+     * @return array{code:string,label:string,currency:string}|null
+     */
+    public function findOperator(string $iso2, string $code): ?array
+    {
+        foreach ($this->operatorsFor($iso2) as $op) {
+            if (($op['code'] ?? null) === $code) {
+                return $op;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Résout le code provider KPay EXACT. Le mobile envoie désormais
+     * directement le code du catalogue (ex. « ORANGE_CMR », « AIRTEL_COD_CDF ») :
+     * si c'est un code valide pour le pays, on le renvoie tel quel. Repli
+     * legacy pour les anciens clients qui envoyaient l'enum interne (Cameroun).
+     */
+    public function providerFor(string $operator, ?string $countryCode = null): string
+    {
+        if ($countryCode && $this->findOperator($countryCode, $operator)) {
+            return $operator;
+        }
+
+        return self::LEGACY_PROVIDER_MAP[$operator] ?? $operator;
+    }
+
+    /**
+     * Liste les providers réellement disponibles sur le compte KPay (pour
+     * vérifier/corriger les codes de config/kpay.php via `kpay:providers`).
+     *
+     * @return array{success:bool, data?:array, message?:string, http?:int|null, body?:array|null}
+     */
+    public function listProviders(): array
+    {
+        return $this->request('GET', '/api/v1/providers');
     }
 
     /**
@@ -102,10 +156,13 @@ class KpayService
      */
     public function initPayment(array $params): array
     {
-        // Mapper l'opérateur interne vers le code provider KPay si nécessaire.
+        // Mapper l'opérateur interne vers le code provider KPay selon le pays
+        // (`country` = code ISO2 optionnel ; repli Cameroun sinon).
         if (isset($params['provider'])) {
-            $params['provider'] = $this->providerFor($params['provider']);
+            $params['provider'] = $this->providerFor($params['provider'], $params['country'] ?? null);
         }
+        // `country` est interne : jamais transmis à KPay.
+        unset($params['country']);
 
         Log::info('[KpayService] Init payment', [
             'externalId' => $params['externalId'] ?? null,

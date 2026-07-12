@@ -58,6 +58,11 @@ class UserSubscription extends Model
             return $existing;
         }
 
+        // Rémunération producteurs : ce paiement d'abonnement crédite +1 vue à
+        // tout le contenu approuvé du tier du forfait. Idempotent par transaction.
+        app(\App\Services\ProducerRevenueService::class)
+            ->creditViewsForSubscription($transaction);
+
         $now = now();
 
         // Renouvellement : tout abonnement actif non expiré de

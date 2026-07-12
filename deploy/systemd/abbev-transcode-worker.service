@@ -1,0 +1,37 @@
+# ---------------------------------------------------------------------------
+# Worker systemd — transcodage ffmpeg des vidéos locales (queue dédiée "transcode")
+#
+# Convertit les .webm/.mkv… uploadées en MP4 (H.264/AAC) lisible iPhone/Safari.
+# SÉPARÉ du worker "bunny" : un encodage long (CPU) ne doit pas bloquer les
+# transferts réseau vers Bunny, et inversement.
+#
+# Installe :
+#   sudo cp deploy/systemd/abbev-transcode-worker.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now abbev-transcode-worker
+#   journalctl -u abbev-transcode-worker -f      # logs en direct
+#
+# Pour traiter PLUSIEURS encodages en parallèle, utilise un template systemd
+# (abbev-transcode-worker@.service) ou Supervisor (numprocs). Ne dépasse pas le
+# nombre de cœurs CPU : ffmpeg les sature.
+#
+# Adapte : WorkingDirectory, ExecStart (chemins projet + php), User/Group.
+# ---------------------------------------------------------------------------
+[Unit]
+Description=ABBEV transcode worker (queue transcode, ffmpeg → MP4)
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/abbev
+ExecStart=/usr/bin/php /var/www/abbev/artisan queue:work transcode --queue=transcode --timeout=0 --tries=1 --sleep=3
+Restart=always
+RestartSec=5
+# Laisse un encodage en cours se terminer avant de tuer le worker.
+TimeoutStopSec=7200
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

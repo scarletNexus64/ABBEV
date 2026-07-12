@@ -249,11 +249,28 @@ class BunnyUploadController extends Controller
     {
         $this->authorizeUploadOwnership($upload);
 
-        if (! $upload->temp_path || ! is_file($upload->temp_path)) {
+        $path = $upload->localFilePath();
+        if (! $path) {
             abort(404, 'Fichier original non disponible (déjà transféré vers Bunny ou supprimé).');
         }
 
-        return response()->download($upload->temp_path, $upload->original_filename);
+        return response()->download($path, $upload->original_filename);
+    }
+
+    /**
+     * Prévisualisation admin de la vidéo locale (disque privé). Sert le fichier
+     * en streaming (support Range) — remplace l'ancien lien /storage direct.
+     */
+    public function stream(BunnyUpload $upload): mixed
+    {
+        $this->authorizeUploadOwnership($upload);
+
+        $path = $upload->localFilePath();
+        if (! $path) {
+            abort(404, 'Vidéo locale non disponible.');
+        }
+
+        return response()->file($path);
     }
 
     /**
@@ -267,7 +284,7 @@ class BunnyUploadController extends Controller
         if ($upload->status !== 'failed') {
             return response()->json(['error' => 'Seuls les uploads en échec peuvent être relancés.'], 422);
         }
-        if (! $upload->temp_path || ! is_file($upload->temp_path)) {
+        if (! $upload->localFilePath()) {
             return response()->json(['error' => 'Fichier original introuvable : impossible de relancer.'], 422);
         }
 
@@ -340,10 +357,10 @@ class BunnyUploadController extends Controller
             }
         }
 
-        // Fichiers (vidéo assemblée publique + chemins éventuels) et morceaux.
+        // Fichiers (vidéo assemblée privée + chemins éventuels) et morceaux.
         $paths = [
             $upload->temp_path,
-            $upload->local_path ? public_path('storage/' . $upload->local_path) : null,
+            $upload->local_path ? \Illuminate\Support\Facades\Storage::disk('local')->path($upload->local_path) : null,
         ];
         foreach ($paths as $p) {
             if ($p && is_file($p)) {
@@ -360,7 +377,7 @@ class BunnyUploadController extends Controller
 
     private function present(BunnyUpload $upload): array
     {
-        $hasLocalFile = (bool) ($upload->temp_path && is_file($upload->temp_path));
+        $hasLocalFile = $upload->localFilePath() !== null;
 
         return [
             'id'             => $upload->id,

@@ -51,7 +51,10 @@ class SubscriptionPaymentKpayTest extends TestCase
         $mock->shouldReceive('initPayment')
             ->once()
             ->with(Mockery::on(function ($params) {
-                return ($params['provider'] ?? null) === 'ORANGE_MONEY'
+                // Le mobile envoie le code du catalogue ; le contrôleur le
+                // transmet tel quel + le pays + le numéro normalisé (237…).
+                return ($params['provider'] ?? null) === 'ORANGE_CMR'
+                    && ($params['country'] ?? null) === 'CM'
                     && ($params['phoneNumber'] ?? null) === '237670000001'
                     && ($params['amount'] ?? null) === 50
                     && !empty($params['externalId']);
@@ -65,7 +68,7 @@ class SubscriptionPaymentKpayTest extends TestCase
         $res = $this->actingAs($user, 'sanctum')->postJson('/api/subscription-payment/initiate', [
             'subscription_plan_id' => $plan->id,
             'payment_method' => 'kpay',
-            'mobile_operator' => 'ORANGE_MONEY',
+            'mobile_operator' => 'ORANGE_CMR',
             'phone_number' => '670000001',
         ]);
 
@@ -104,7 +107,7 @@ class SubscriptionPaymentKpayTest extends TestCase
         $res = $this->actingAs($user, 'sanctum')->postJson('/api/subscription-payment/initiate', [
             'subscription_plan_id' => $plan->id,
             'payment_method' => 'kpay',
-            'mobile_operator' => 'MTN_MONEY',
+            'mobile_operator' => 'MTN_MOMO_CMR',
             'phone_number' => '670000001',
         ]);
 
@@ -125,19 +128,19 @@ class SubscriptionPaymentKpayTest extends TestCase
         $user = User::factory()->create();
         $plan = $this->makePlan();
 
-        // Opérateur hors liste blanche → 422 (validation), KPay jamais appelé.
+        // Opérateur inconnu pour le pays → 422 (rejeté par le contrôleur).
         $this->actingAs($user, 'sanctum')->postJson('/api/subscription-payment/initiate', [
             'subscription_plan_id' => $plan->id,
             'payment_method' => 'kpay',
             'mobile_operator' => 'BITCOIN',
             'phone_number' => '670000001',
-        ])->assertStatus(422)->assertJsonValidationErrors(['mobile_operator']);
+        ])->assertStatus(422)->assertJson(['success' => false]);
 
-        // Numéro manquant → 422.
+        // Numéro manquant → 422 (validation).
         $this->actingAs($user, 'sanctum')->postJson('/api/subscription-payment/initiate', [
             'subscription_plan_id' => $plan->id,
             'payment_method' => 'kpay',
-            'mobile_operator' => 'ORANGE_MONEY',
+            'mobile_operator' => 'ORANGE_CMR',
         ])->assertStatus(422)->assertJsonValidationErrors(['phone_number']);
     }
 

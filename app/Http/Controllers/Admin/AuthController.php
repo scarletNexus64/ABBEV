@@ -50,6 +50,12 @@ class AuthController extends Controller
                 return back()->withErrors(['email' => 'Accès non autorisé.']);
             }
 
+            // Compte suspendu par un admin → connexion refusée.
+            if (! $user->is_active) {
+                Auth::logout();
+                return back()->withErrors(['email' => 'Ce compte a été suspendu. Contactez un administrateur.']);
+            }
+
             $request->session()->regenerate();
             return redirect()->intended(route('admin.dashboard'));
         }

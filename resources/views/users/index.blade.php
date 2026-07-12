@@ -55,23 +55,31 @@
     </div>
 </div>
 
-<!-- Search Bar -->
+<!-- Search Bar + Ajouter -->
 <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-4 mb-6">
-    <form action="{{ route('users.index') }}" method="GET" class="flex gap-4">
-        <div class="flex-1">
-            <input type="text" name="search" value="{{ request('search') }}"
-                   placeholder="Rechercher par nom ou email..."
-                   class="w-full bg-dark-50 border border-dark-200 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary-500">
-        </div>
-        <button type="submit" class="bg-primary-500 hover:bg-primary-600 text-white px-6 py-2 rounded-lg transition">
-            <i class="fas fa-search mr-2"></i> Rechercher
-        </button>
-        @if(request('search'))
-        <a href="{{ route('users.index') }}" class="bg-dark-200 hover:bg-dark-300 text-white px-6 py-2 rounded-lg transition">
-            <i class="fas fa-times"></i>
+    <div class="flex flex-col md:flex-row gap-4 md:items-center">
+        <form action="{{ route('users.index') }}" method="GET" class="flex gap-4 flex-1">
+            <div class="flex-1">
+                <input type="text" name="search" value="{{ request('search') }}"
+                       placeholder="Rechercher par nom ou email..."
+                       class="w-full bg-dark-50 border border-dark-200 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary-500">
+            </div>
+            <button type="submit" class="bg-primary-500 hover:bg-primary-600 text-white px-6 py-2 rounded-lg transition">
+                <i class="fas fa-search mr-2"></i> Rechercher
+            </button>
+            @if(request('search'))
+            <a href="{{ route('users.index') }}" class="bg-dark-200 hover:bg-dark-300 text-white px-6 py-2 rounded-lg transition">
+                <i class="fas fa-times"></i>
+            </a>
+            @endif
+        </form>
+        @can('create', App\Models\User::class)
+        <a href="{{ route('users.create') }}"
+           class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg transition text-center whitespace-nowrap">
+            <i class="fas fa-user-plus mr-2"></i> Ajouter un utilisateur
         </a>
-        @endif
-    </form>
+        @endcan
+    </div>
 </div>
 
 <!-- Users Table -->
@@ -96,6 +104,11 @@
                             </div>
                             <div class="ml-3">
                                 <p class="text-white font-medium">{{ $user->name }}</p>
+                                @if($user->is_active)
+                                <span class="text-green-400 text-xs"><i class="fas fa-circle-check mr-1"></i>Actif</span>
+                                @else
+                                <span class="text-red-400 text-xs"><i class="fas fa-ban mr-1"></i>Suspendu</span>
+                                @endif
                             </div>
                         </div>
                     </td>
@@ -103,20 +116,64 @@
                     <td class="px-6 py-4 text-gray-400 text-sm">{{ $user->created_at->format('d/m/Y') }}</td>
                     <td class="px-6 py-4">
                         <div class="flex items-center justify-center gap-2">
-                            <a href="{{ route('users.show', $user) }}"
-                               class="bg-primary-500/20 hover:bg-primary-500 text-primary-400 hover:text-white px-3 py-2 rounded-lg text-sm transition">
-                                <i class="fas fa-eye"></i> Voir
+                            <a href="{{ route('users.show', $user) }}" title="Voir la fiche"
+                               class="w-9 h-9 inline-flex items-center justify-center bg-primary-500/20 hover:bg-primary-500 text-primary-400 hover:text-white rounded-lg text-sm transition">
+                                <i class="fas fa-eye"></i>
                             </a>
+
+                            @can('update', $user)
+                            <a href="{{ route('users.edit', $user) }}" title="Modifier les infos"
+                               class="w-9 h-9 inline-flex items-center justify-center bg-blue-500/20 hover:bg-blue-500 text-blue-400 hover:text-white rounded-lg text-sm transition">
+                                <i class="fas fa-pen"></i>
+                            </a>
+                            @endcan
+
+                            @can('updateStatus', $user)
+                            <form action="{{ route('users.status', $user) }}" method="POST" class="inline"
+                                  data-confirm="{{ $user->is_active ? 'Suspendre' : 'Réactiver' }} le compte de « {{ $user->name }} » ?"
+                                  data-confirm-type="{{ $user->is_active ? 'warning' : 'primary' }}"
+                                  data-confirm-confirm="{{ $user->is_active ? 'Suspendre' : 'Réactiver' }}">
+                                @csrf @method('PATCH')
+                                <input type="hidden" name="is_active" value="{{ $user->is_active ? 0 : 1 }}">
+                                @if($user->is_active)
+                                <button type="submit" title="Suspendre le compte"
+                                        class="w-9 h-9 inline-flex items-center justify-center bg-amber-500/20 hover:bg-amber-500 text-amber-400 hover:text-white rounded-lg text-sm transition">
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                                @else
+                                <button type="submit" title="Réactiver le compte"
+                                        class="w-9 h-9 inline-flex items-center justify-center bg-green-500/20 hover:bg-green-500 text-green-400 hover:text-white rounded-lg text-sm transition">
+                                    <i class="fas fa-circle-check"></i>
+                                </button>
+                                @endif
+                            </form>
+                            @endcan
+
+                            @can('resetPassword', $user)
+                            <form action="{{ route('users.resetPassword', $user) }}" method="POST" class="inline"
+                                  data-confirm="Régénérer le mot de passe de « {{ $user->name }} » et le lui envoyer par email ?"
+                                  data-confirm-type="primary" data-confirm-confirm="Réinitialiser">
+                                @csrf
+                                <button type="submit" title="Réinitialiser le mot de passe"
+                                        class="w-9 h-9 inline-flex items-center justify-center bg-sky-500/20 hover:bg-sky-500 text-sky-400 hover:text-white rounded-lg text-sm transition">
+                                    <i class="fas fa-key"></i>
+                                </button>
+                            </form>
+                            @endcan
+
+                            @can('delete', $user)
                             <form action="{{ route('users.destroy', $user) }}" method="POST"
-                                  onsubmit="return confirm('Supprimer définitivement l\'utilisateur « {{ $user->name }} » ({{ $user->email }}) ?\n\nCette action est irréversible.');"
+                                  data-confirm="Supprimer définitivement l'utilisateur « {{ $user->name }} » ({{ $user->email }}) ? Cette action est irréversible."
+                                  data-confirm-type="danger" data-confirm-title="Supprimer l'utilisateur" data-confirm-confirm="Supprimer"
                                   class="inline">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit"
-                                        class="bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white px-3 py-2 rounded-lg text-sm transition">
-                                    <i class="fas fa-trash"></i> Supprimer
+                                <button type="submit" title="Supprimer l'utilisateur"
+                                        class="w-9 h-9 inline-flex items-center justify-center bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white rounded-lg text-sm transition">
+                                    <i class="fas fa-trash"></i>
                                 </button>
                             </form>
+                            @endcan
                         </div>
                     </td>
                 </tr>

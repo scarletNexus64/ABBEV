@@ -31,6 +31,7 @@ class SubscriptionPlanController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'tier' => 'required|in:classique,standard,premium',
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
             'duration_days' => 'required|integer|min:1',
@@ -60,6 +61,7 @@ class SubscriptionPlanController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'tier' => 'required|in:classique,standard,premium',
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
             'duration_days' => 'required|integer|min:1',

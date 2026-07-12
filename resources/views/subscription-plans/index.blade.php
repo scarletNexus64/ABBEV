@@ -135,7 +135,8 @@
                     <i class="fas fa-edit"></i> Modifier
                 </a>
                 <form action="{{ route('subscription-plans.destroy', $plan) }}" method="POST"
-                      onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer ce pack ?');"
+                      data-confirm="Supprimer ce pack d'abonnement ?"
+                      data-confirm-type="danger" data-confirm-title="Supprimer le pack" data-confirm-confirm="Supprimer"
                       class="flex-1">
                     @csrf
                     @method('DELETE')
