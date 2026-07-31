@@ -42,6 +42,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/me',         [AuthApiController::class, 'me']);
             Route::patch('/me',       [AuthApiController::class, 'updateMe']);
             Route::post('/logout',    [AuthApiController::class, 'logout']);
+            // Suppression définitive du compte — exigée par l'App Store
+            // (Guideline 5.1.1(v)) pour toute app à création de compte.
+            Route::delete('/me',      [AuthApiController::class, 'deleteAccount']);
             Route::get('/me/stats',   [AuthApiController::class, 'stats']);
             Route::get('/me/subscription', [AuthApiController::class, 'currentSubscription']);
             Route::post('/watch-history', [AuthApiController::class, 'recordWatch']);

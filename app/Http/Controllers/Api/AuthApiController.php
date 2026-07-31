@@ -720,4 +720,66 @@ class AuthApiController extends Controller
             'message' => __('messages.auth.logged_out'),
         ]);
     }
+
+    /**
+     * Suppression DÉFINITIVE du compte et des données personnelles.
+     *
+     * Exigée par l'App Store (Guideline 5.1.1(v)) pour toute application
+     * permettant la création d'un compte : la suppression doit être possible
+     * depuis l'app elle-même, sans passer par le support.
+     *
+     * Ce qui part avec l'utilisateur (cascades déclarées en base) :
+     * abonnements, transactions, « ma liste », historique de lecture,
+     * réservations, jetons d'accès.
+     *
+     * Ce qui SURVIT volontairement :
+     *  - les médias dont il serait producteur (`media.user_id` est en
+     *    `nullOnDelete`) : le catalogue ne doit pas disparaître avec un
+     *    compte ;
+     *  - les séances qu'il aurait créées (`screenings.created_by`, idem).
+     *
+     * Le mot de passe est redemandé quand le compte en a un : la suppression
+     * est irréversible, un token volé ne doit pas suffire à la déclencher.
+     * Les comptes créés par OTP (sans mot de passe) en sont dispensés.
+     */
+    public function deleteAccount(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->password) {
+            $request->validate([
+                'password' => 'required|string',
+            ]);
+
+            if (! Hash::check($request->input('password'), $user->password)) {
+                return response()->json([
+                    'message' => __('messages.auth.invalid_password'),
+                ], 422);
+            }
+        }
+
+        // Un abonnement acheté via l'App Store se résilie chez Apple : la
+        // suppression du compte ne l'interrompt pas. On le signale pour que
+        // l'app puisse en avertir l'utilisateur AVANT confirmation.
+        $hasAppleSub = $user->subscriptions()
+            ->where('status', 'active')
+            ->where('expires_at', '>', now())
+            ->whereHas('transaction', fn ($q) => $q->where('payment_method', 'apple'))
+            ->exists();
+
+        Log::info('[Account] suppression demandée', [
+            'user_id' => $user->id,
+            'had_apple_subscription' => $hasAppleSub,
+        ]);
+
+        // Révoque tous les jetons avant suppression (sessions sur d'autres
+        // appareils comprises).
+        $user->tokens()->delete();
+        $user->delete();
+
+        return response()->json([
+            'message' => __('messages.auth.account_deleted'),
+            'apple_subscription_active' => $hasAppleSub,
+        ]);
+    }
 }

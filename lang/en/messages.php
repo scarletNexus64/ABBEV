@@ -18,6 +18,8 @@ return [
         'code_valid'        => 'Valid code.',
         'password_reset'    => 'Password reset successfully.',
         'logged_out'        => 'Signed out successfully.',
+        'invalid_password'  => 'Incorrect password.',
+        'account_deleted'   => 'Your account and data have been permanently deleted.',
         'unauthenticated'   => 'Not authenticated.',
         'forbidden_admin'   => 'Access denied: administrator role required.',
         'history_saved'     => 'History saved.',

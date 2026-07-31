@@ -22,6 +22,8 @@ return [
         'code_valid'          => 'Code valide.',
         'password_reset'      => 'Mot de passe réinitialisé avec succès.',
         'logged_out'          => 'Déconnexion réussie.',
+        'invalid_password'    => 'Mot de passe incorrect.',
+        'account_deleted'     => 'Votre compte et vos données ont été supprimés définitivement.',
         'unauthenticated'     => 'Non authentifié.',
         'forbidden_admin'     => 'Accès interdit : rôle administrateur requis.',
         'history_saved'       => 'Historique enregistré.',
