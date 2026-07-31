@@ -597,12 +597,18 @@ class SubscriptionPaymentController extends Controller
 
         $user = auth()->user();
 
+        Log::info('[SubscriptionPayment] Apple verify — requête reçue', [
+            'user_id' => $user->id,
+            'transaction_id' => $validated['transaction_id'],
+        ]);
+
         try {
             $result = $this->appleService->getTransaction($validated['transaction_id']);
 
             if (!$result['success']) {
                 Log::warning('[SubscriptionPayment] Apple verify failed', [
                     'user_id' => $user->id,
+                    'transaction_id' => $validated['transaction_id'],
                     'reason' => $result['message'] ?? 'unknown',
                 ]);
 
@@ -614,7 +620,26 @@ class SubscriptionPaymentController extends Controller
 
             $payload = $result['payload'];
 
+            Log::info('[SubscriptionPayment] Apple transaction récupérée', [
+                'user_id' => $user->id,
+                'product_id' => $payload['productId'] ?? null,
+                'bundle_id' => $payload['bundleId'] ?? null,
+                'environment' => $payload['environment'] ?? null,
+                'original_transaction_id' => $payload['originalTransactionId'] ?? null,
+                'expires_date' => $payload['expiresDate'] ?? null,
+                'revocation_date' => $payload['revocationDate'] ?? null,
+            ]);
+
             if (!$this->appleService->isTransactionValid($payload)) {
+                // Cause quasi systématique : bundleId du payload ≠ celui
+                // configuré (APPLE_IAP_BUNDLE_ID), ou achat remboursé.
+                Log::warning('[SubscriptionPayment] Apple transaction invalide', [
+                    'user_id' => $user->id,
+                    'payload_bundle_id' => $payload['bundleId'] ?? null,
+                    'expected_bundle_id' => config('services.apple_iap.bundle_id'),
+                    'revocation_date' => $payload['revocationDate'] ?? null,
+                ]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Transaction Apple invalide ou révoquée',
@@ -624,11 +649,23 @@ class SubscriptionPaymentController extends Controller
             $transaction = $this->provisionAppleTransaction($payload, $user->id);
 
             if (!$transaction) {
+                // provisionAppleTransaction loggue déjà le produit non mappé.
+                Log::warning('[SubscriptionPayment] Apple provisioning impossible', [
+                    'user_id' => $user->id,
+                    'product_id' => $payload['productId'] ?? null,
+                ]);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Plan introuvable pour ce produit Apple',
                 ], 422);
             }
+
+            Log::info('[SubscriptionPayment] Apple — abonnement activé', [
+                'user_id' => $user->id,
+                'transaction_id' => $transaction->transaction_id,
+                'product_id' => $payload['productId'] ?? null,
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -694,10 +731,10 @@ class SubscriptionPaymentController extends Controller
             }
         }
 
-        // Expiration / remboursement : on laisse le passage à expiration
-        // naturel (expires_at) gérer l'accès ; un refund révoque la transaction.
+        // Expiration : `expires_at` gère naturellement la fin d'accès.
+        // Remboursement : on coupe l'accès immédiatement (cf. revoke).
         if (in_array($type, ['REFUND', 'EXPIRED', 'GRACE_PERIOD_EXPIRED'], true)) {
-            $this->revokeAppleTransaction($payload);
+            $this->revokeAppleTransaction($payload, $type);
         }
 
         return response()->json(['message' => 'ok']);
@@ -721,6 +758,10 @@ class SubscriptionPaymentController extends Controller
         if (!$plan) {
             Log::warning('[SubscriptionPayment] Apple product not mapped', [
                 'product_id' => $productId,
+                // Aide au diagnostic : aucun plan ne porte cet apple_product_id.
+                'known_product_ids' => SubscriptionPlan::whereNotNull('apple_product_id')
+                    ->pluck('apple_product_id')
+                    ->all(),
             ]);
 
             return null;
@@ -749,7 +790,11 @@ class SubscriptionPaymentController extends Controller
                     'plan_name' => $plan->name,
                     'duration_days' => $plan->duration_days,
                     'apple_product_id' => $productId,
-                    'apple_original_transaction_id' => $payload['originalTransactionId'] ?? null,
+                    // Sur l'achat initial, Apple peut omettre
+                    // originalTransactionId : il vaut alors la transaction
+                    // elle-même. Sans ce repli, aucun DID_RENEW ultérieur ne
+                    // retrouverait l'utilisateur (renouvellements perdus).
+                    'apple_original_transaction_id' => $payload['originalTransactionId'] ?? $appleTxId,
                 ],
             ]);
 
@@ -775,13 +820,24 @@ class SubscriptionPaymentController extends Controller
             ->where('metadata->apple_original_transaction_id', $originalId)
             ->first();
 
+        // Repli : les transactions écrites avant l'ajout du fallback ci-dessus
+        // peuvent porter un originalTransactionId null. L'achat initial est
+        // alors retrouvable par son propre transactionId.
+        $prior ??= Transaction::where('payment_method', 'apple_iap')
+            ->where('external_reference', $originalId)
+            ->first();
+
         return $prior?->user_id;
     }
 
     /**
-     * Marque la transaction Apple comme remboursée (révoquée).
+     * Révoque une transaction Apple (remboursement / expiration).
+     *
+     * Un REFUND doit couper l'accès immédiatement : marquer la Transaction
+     * ne suffit pas, c'est le UserSubscription qui porte le droit d'accès.
+     * Sur une simple expiration, on laisse `expires_at` faire son office.
      */
-    protected function revokeAppleTransaction(array $payload): void
+    protected function revokeAppleTransaction(array $payload, ?string $type = null): void
     {
         $appleTxId = $payload['transactionId'] ?? null;
 
@@ -789,9 +845,30 @@ class SubscriptionPaymentController extends Controller
             return;
         }
 
-        Transaction::where('external_reference', $appleTxId)
+        $transaction = Transaction::where('external_reference', $appleTxId)
             ->where('payment_method', 'apple_iap')
-            ->update(['status' => 'failed']);
+            ->first();
+
+        if (!$transaction) {
+            return;
+        }
+
+        $transaction->update(['status' => 'failed']);
+
+        // Seul un remboursement retire un accès déjà payé.
+        if ($type !== 'REFUND') {
+            return;
+        }
+
+        $revoked = UserSubscription::where('transaction_id', $transaction->id)
+            ->where('status', 'active')
+            ->update(['status' => 'cancelled', 'expires_at' => now()]);
+
+        Log::info('[SubscriptionPayment] Apple refund — accès révoqué', [
+            'transaction_id' => $transaction->transaction_id,
+            'user_id' => $transaction->user_id,
+            'subscriptions_revoked' => $revoked,
+        ]);
     }
 
     /**

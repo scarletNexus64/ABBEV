@@ -100,6 +100,13 @@ return [
         'private_key' => env('APPLE_IAP_PRIVATE_KEY'),
         'key_path'    => env('APPLE_IAP_KEY_PATH'),
         'sandbox'     => (bool) env('APPLE_IAP_SANDBOX', true),
+        // Racine de confiance pour vérifier la signature des App Store Server
+        // Notifications v2 (route publique → la signature fait seule foi).
+        // Téléchargeable sur https://www.apple.com/certificateauthority/
+        'root_cert_path' => env(
+            'APPLE_IAP_ROOT_CERT_PATH',
+            storage_path('app/private/apple/AppleRootCA-G3.pem')
+        ),
     ],
 
     /*

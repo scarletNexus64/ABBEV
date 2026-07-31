@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\LocalVideoStreamController;
 use App\Http\Controllers\Api\MediaApiController;
 use App\Http\Controllers\Api\MyListApiController;
 use App\Http\Controllers\Api\ReservationPaymentController;
+use App\Http\Controllers\Api\RubriqueApiController;
 use App\Http\Controllers\Api\ScreeningApiController;
 use App\Http\Controllers\Api\StripeWebhookController;
 use App\Http\Controllers\Api\SubscriptionPaymentController;
@@ -137,6 +138,15 @@ Route::prefix('v1')->group(function () {
         ->middleware('signed')
         ->where('type', 'movie|episode')
         ->name('api.watch.local');
+
+    // -------------------------------------------------------------
+    // PUBLIC — rubriques thématiques (chips de l'accueil mobile)
+    // -------------------------------------------------------------
+    // Volontairement hors `auth:sanctum` : un visiteur non connecté doit voir
+    // les rubriques ouvertes. Le contrôleur résout lui-même l'utilisateur via
+    // le guard sanctum pour filtrer celles qui exigent un abonnement.
+    Route::get('/rubriques',                       [RubriqueApiController::class, 'index']);
+    Route::get('/rubriques/{rubrique}/contents',   [RubriqueApiController::class, 'contents']);
 
     // -------------------------------------------------------------
     // PUBLIC — catégories / recherche / featured global
