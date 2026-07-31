@@ -17,9 +17,9 @@ class OeuvreResource extends JsonResource
     {
         return [
             'id' => (int) $this->id,
-            'title' => $this->title,
+            'title' => $this->t('title'),
             'author' => $this->author,
-            'description' => $this->description,
+            'description' => $this->t('description'),
             'pages' => $this->pages !== null ? (int) $this->pages : null,
             'cover_url' => $this->absoluteUrl($this->cover_path),
             'file_url' => $this->absoluteUrl($this->file_path),

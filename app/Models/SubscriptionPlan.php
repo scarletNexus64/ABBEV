@@ -4,9 +4,15 @@ namespace App\Models;
 
 use App\Concerns\HasObfuscatedRouteKey;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\HasTranslations;
 
 class SubscriptionPlan extends Model
 {
+    use HasTranslations;
+
+    /** Champs exposés à l'app et traduits via la table `translations`. */
+    public array $translatable = ['name', 'description', 'features'];
+
     use HasObfuscatedRouteKey;
 
     protected $fillable = [

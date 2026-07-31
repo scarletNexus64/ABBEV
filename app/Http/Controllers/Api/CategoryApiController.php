@@ -49,6 +49,6 @@ class CategoryApiController extends Controller
     {
         $category->delete();
 
-        return response()->json(['message' => 'Catégorie supprimée.']);
+        return response()->json(['message' => __('messages.admin.category_deleted')]);
     }
 }

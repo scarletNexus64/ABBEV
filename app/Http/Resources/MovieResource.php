@@ -31,9 +31,11 @@ class MovieResource extends JsonResource
             'id' => (string) $this->id,
             'slug' => $this->slug,
             'type' => $this->type,
-            'title' => $this->title,
+            'title' => $this->t('title'),
+            // `originalTitle` = titre d'origine, JAMAIS traduit : c'est la
+            // référence stable de l'œuvre (recherche, partage, support).
             'originalTitle' => $this->title,
-            'description' => (string) $this->description,
+            'description' => (string) $this->t('description'),
             'posterUrl' => $this->absoluteUrl($this->cover_path ?: $this->thumbnail_path) ?? $bunnyThumb,
             'backdropUrl' => $this->absoluteUrl($this->banner_path ?: $this->cover_path ?: $this->thumbnail_path) ?? $bunnyThumb,
             'thumbnailUrl' => $this->absoluteUrl($this->thumbnail_path) ?? $bunnyThumb,
@@ -45,10 +47,10 @@ class MovieResource extends JsonResource
             'voteCount' => (int) ($this->views_count ?? 0),
             'releaseDate' => $this->release_year ? sprintf('%04d-01-01', $this->release_year) : null,
             'duration' => $this->duration ? intval(round($this->duration / 60)) : 0, // minutes
-            'genres' => $this->category ? [$this->category->name] : [],
+            'genres' => $this->category ? [$this->category->t('name')] : [],
             'category' => $this->whenLoaded('category', fn () => [
                 'id' => (string) $this->category->id,
-                'name' => $this->category->name,
+                'name' => $this->category->t('name'),
                 'slug' => $this->category->slug ?? null,
             ]),
             'cast' => [],

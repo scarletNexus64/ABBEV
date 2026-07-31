@@ -18,7 +18,7 @@ class EnsureIsAdmin
 
         if (! $user || ! method_exists($user, 'isAdmin') || ! $user->isAdmin()) {
             return response()->json([
-                'message' => 'Accès interdit : rôle administrateur requis.',
+                'message' => __('messages.auth.forbidden_admin'),
             ], 403);
         }
 

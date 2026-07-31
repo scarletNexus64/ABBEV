@@ -130,8 +130,7 @@ class NowPaymentsService
             $min = number_format($this->minAmountXaf, 0, '.', ' ');
             return [
                 'success' => false,
-                'message' => "Montant minimum pour un paiement crypto : {$min} FCFA. "
-                    . 'Certaines cryptos (BTC, ETH) ont des frais réseau élevés qui imposent un minimum plus haut.',
+                'message' => __('messages.payment.crypto_min_amount', ['min' => $min]),
             ];
         }
 
@@ -186,9 +185,7 @@ class NowPaymentsService
 
                     return [
                         'success' => false,
-                        'message' => "Ce montant est trop faible pour un paiement crypto. "
-                            . "Le minimum est d'environ {$min} FCFA (les frais réseau Bitcoin/Ethereum "
-                            . 'imposent un seuil élevé). Choisissez un montant plus important.',
+                        'message' => __('messages.payment.crypto_amount_too_low', ['min' => $min]),
                     ];
                 }
 

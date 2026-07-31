@@ -25,6 +25,10 @@ class DatabaseSeeder extends Seeder
             ConfigurationSeeder::class,
             ScreeningSeeder::class,
             RubriqueSeeder::class,
+
+            // EN DERNIER : traduit le contenu créé par les seeders ci-dessus.
+            // Placé ailleurs, il ne trouverait rien à traduire.
+            TranslationSeeder::class,
         ]);
     }
 }

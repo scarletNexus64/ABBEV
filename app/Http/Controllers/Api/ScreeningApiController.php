@@ -128,7 +128,7 @@ class ScreeningApiController extends Controller
         }
 
         return response()->json([
-            'message'     => 'Réservation créée. Procédez au paiement pour la confirmer.',
+            'message'     => __('messages.reservation.created'),
             'reservation' => $this->presentReservation($result['reservation']),
             'payment'     => [
                 'transaction_id' => $result['transaction']->transaction_id,
@@ -145,7 +145,7 @@ class ScreeningApiController extends Controller
     public function confirm(Request $request, Reservation $reservation): JsonResponse
     {
         if ($reservation->user_id !== $request->user()->id) {
-            return response()->json(['message' => 'Réservation introuvable.'], 404);
+            return response()->json(['message' => __('messages.reservation.not_found')], 404);
         }
 
         try {
@@ -155,7 +155,7 @@ class ScreeningApiController extends Controller
         }
 
         return response()->json([
-            'message'     => 'Réservation confirmée.',
+            'message'     => __('messages.reservation.confirmed'),
             'reservation' => $this->presentReservation($reservation),
         ]);
     }
@@ -180,13 +180,13 @@ class ScreeningApiController extends Controller
     public function cancel(Request $request, Reservation $reservation): JsonResponse
     {
         if ($reservation->user_id !== $request->user()->id) {
-            return response()->json(['message' => 'Réservation introuvable.'], 404);
+            return response()->json(['message' => __('messages.reservation.not_found')], 404);
         }
 
         $reservation = $this->reservations->cancel($reservation);
 
         return response()->json([
-            'message'     => 'Réservation annulée.',
+            'message'     => __('messages.reservation.cancelled'),
             'reservation' => $this->presentReservation($reservation),
         ]);
     }

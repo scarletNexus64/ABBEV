@@ -11,9 +11,9 @@ class CategoryResource extends JsonResource
     {
         return [
             'id' => (string) $this->id,
-            'name' => $this->name,
+            'name' => $this->t('name'),
             'slug' => $this->slug ?? null,
-            'description' => $this->description ?? '',
+            'description' => $this->t('description') ?? '',
             'mediaCount' => (int) ($this->media_count ?? 0),
         ];
     }

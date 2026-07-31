@@ -35,12 +35,12 @@ class ReservationService
         string $paymentMethod = 'mobile'
     ): array {
         if ($quantity < 1) {
-            throw new RuntimeException('La quantité doit être au moins 1.');
+            throw new RuntimeException(__('messages.reservation.quantity_min'));
         }
 
         // Vérification indicative (le contrôle ferme se fait à la confirmation).
         if ($ticketType->availableSeats() < $quantity) {
-            throw new RuntimeException('Plus assez de places disponibles dans cette catégorie.');
+            throw new RuntimeException(__('messages.reservation.not_enough_seats'));
         }
 
         $unitPrice = (float) $ticketType->price;
@@ -115,7 +115,7 @@ class ReservationService
         }
 
         if ($reservation->status === 'canceled') {
-            throw new RuntimeException('Réservation annulée, impossible de confirmer.');
+            throw new RuntimeException(__('messages.reservation.cancelled_cannot_confirm'));
         }
 
         return DB::transaction(function () use ($reservation) {
@@ -126,7 +126,7 @@ class ReservationService
                 ->first();
 
             if (! $type || ($type->capacity - $type->sold_seats) < $reservation->quantity) {
-                throw new RuntimeException('Plus assez de places pour confirmer cette réservation.');
+                throw new RuntimeException(__('messages.reservation.not_enough_to_confirm'));
             }
 
             $type->increment('sold_seats', $reservation->quantity);

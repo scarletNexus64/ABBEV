@@ -104,7 +104,7 @@ class ReservationPaymentController extends Controller
             $this->reservations->cancel($reservation);
             return response()->json([
                 'success' => false,
-                'message' => 'Le paiement par carte n\'est pas disponible pour le moment.',
+                'message' => __('messages.payment.card_unavailable'),
             ], 503);
         }
 
@@ -122,7 +122,7 @@ class ReservationPaymentController extends Controller
             $this->reservations->cancel($reservation);
             return response()->json([
                 'success' => false,
-                'message' => $result['message'] ?? "Impossible d'initier le paiement par carte.",
+                'message' => $result['message'] ?? __('messages.payment.card_init_failed'),
             ], 400);
         }
 
@@ -153,7 +153,7 @@ class ReservationPaymentController extends Controller
             $this->reservations->cancel($reservation);
             return response()->json([
                 'success' => false,
-                'message' => 'Le paiement PayPal n\'est pas disponible pour le moment. Choisissez Mobile Money ou réessayez plus tard.',
+                'message' => __('messages.payment.paypal_unavailable'),
             ], 503);
         }
 
@@ -168,7 +168,7 @@ class ReservationPaymentController extends Controller
             $this->reservations->cancel($reservation);
             return response()->json([
                 'success' => false,
-                'message' => $result['message'] ?? "Impossible d'initier le paiement PayPal.",
+                'message' => $result['message'] ?? __('messages.payment.paypal_init_failed'),
             ], 400);
         }
 
@@ -212,7 +212,7 @@ class ReservationPaymentController extends Controller
                 $this->reservations->cancel($reservation);
                 return response()->json([
                     'success' => false,
-                    'message' => "Cet opérateur n'est pas disponible pour {$country['name']}.",
+                    'message' => __('messages.payment.operator_unavailable', ['country' => $country['name']]),
                 ], 422);
             }
         }
@@ -229,7 +229,7 @@ class ReservationPaymentController extends Controller
             $this->reservations->cancel($reservation);
             return response()->json([
                 'success' => false,
-                'message' => $result['message'] ?? "Échec de l'initialisation KPay.",
+                'message' => $result['message'] ?? __('messages.payment.kpay_init_failed'),
             ], 400);
         }
 
@@ -255,7 +255,7 @@ class ReservationPaymentController extends Controller
             'reference'      => $kpayId,
             'kpay_reference' => $kpayRef,
             'status'         => $kpayData['status'] ?? 'pending',
-            'message'        => 'Veuillez valider le paiement sur votre téléphone.',
+            'message'        => __('messages.payment.validate_on_phone'),
             'reservation'    => $this->presentReservation($reservation),
         ]);
     }
@@ -273,7 +273,7 @@ class ReservationPaymentController extends Controller
             ->first();
 
         if (! $transaction) {
-            return response()->json(['success' => false, 'message' => 'Transaction introuvable.'], 404);
+            return response()->json(['success' => false, 'message' => __('messages.payment.transaction_not_found')], 404);
         }
 
         $result = $this->paypal->captureOrder($validated['order_id']);
@@ -283,7 +283,7 @@ class ReservationPaymentController extends Controller
             $this->reservations->confirmFromTransaction($transaction); // no-op (résa reste pending)
             return response()->json([
                 'success' => false,
-                'message' => $result['message'] ?? 'La capture du paiement a échoué.',
+                'message' => $result['message'] ?? __('messages.payment.capture_failed'),
             ], 400);
         }
 
@@ -293,7 +293,7 @@ class ReservationPaymentController extends Controller
 
         return response()->json([
             'success'        => true,
-            'message'        => 'Réservation confirmée.',
+            'message'        => __('messages.reservation.confirmed'),
             'transaction_id' => $transaction->transaction_id,
             'reservation'    => $reservation ? $this->presentReservation($reservation) : null,
         ]);
@@ -317,7 +317,7 @@ class ReservationPaymentController extends Controller
             ->first();
 
         if (! $transaction) {
-            return response()->json(['success' => false, 'message' => 'Transaction introuvable.'], 404);
+            return response()->json(['success' => false, 'message' => __('messages.payment.transaction_not_found')], 404);
         }
 
         $result = $this->stripe->retrievePaymentIntent($validated['payment_intent_id']);
@@ -325,7 +325,7 @@ class ReservationPaymentController extends Controller
         if (! ($result['success'] ?? false)) {
             return response()->json([
                 'success' => false,
-                'message' => $result['message'] ?? 'Vérification Stripe impossible.',
+                'message' => $result['message'] ?? __('messages.payment.stripe_verify_failed'),
             ], 400);
         }
 
@@ -333,7 +333,7 @@ class ReservationPaymentController extends Controller
             return response()->json([
                 'success' => true,
                 'status'  => 'pending',
-                'message' => 'Paiement en cours de traitement.',
+                'message' => __('messages.payment.processing'),
             ]);
         }
 
@@ -346,7 +346,7 @@ class ReservationPaymentController extends Controller
         return response()->json([
             'success'        => true,
             'status'         => 'completed',
-            'message'        => 'Réservation confirmée.',
+            'message'        => __('messages.reservation.confirmed'),
             'transaction_id' => $transaction->transaction_id,
             'reservation'    => $reservation ? $this->presentReservation($reservation) : null,
         ]);
@@ -366,7 +366,7 @@ class ReservationPaymentController extends Controller
             ->first();
 
         if (! $transaction) {
-            return response()->json(['success' => false, 'message' => 'Transaction introuvable.'], 404);
+            return response()->json(['success' => false, 'message' => __('messages.payment.transaction_not_found')], 404);
         }
 
         $result = $this->kpay->getPayment($transaction->external_reference);
@@ -374,7 +374,7 @@ class ReservationPaymentController extends Controller
         if (! ($result['success'] ?? false)) {
             return response()->json([
                 'success' => false,
-                'message' => $result['message'] ?? 'Erreur lors de la vérification.',
+                'message' => $result['message'] ?? __('messages.payment.verify_failed'),
             ], 400);
         }
 
@@ -390,7 +390,7 @@ class ReservationPaymentController extends Controller
             return response()->json([
                 'success'     => true,
                 'status'      => 'completed',
-                'message'     => 'Réservation confirmée.',
+                'message'     => __('messages.reservation.confirmed'),
                 'reservation' => $reservation ? $this->presentReservation($reservation) : null,
             ]);
         }
@@ -399,14 +399,14 @@ class ReservationPaymentController extends Controller
             return response()->json([
                 'success' => false,
                 'status'  => 'failed',
-                'message' => 'Le paiement a échoué.',
+                'message' => __('messages.payment.failed'),
             ]);
         }
 
         return response()->json([
             'success' => true,
             'status'  => 'pending',
-            'message' => 'Paiement en cours de traitement.',
+            'message' => __('messages.payment.processing'),
         ]);
     }
 

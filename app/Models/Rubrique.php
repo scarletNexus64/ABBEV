@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Concerns\HasTranslations;
 
 /**
  * Section thématique mise en avant dans l'app mobile (chips d'accueil).
@@ -16,6 +17,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Rubrique extends Model
 {
+    use HasTranslations;
+
+    /** Champs exposés à l'app et traduits via la table `translations`. */
+    public array $translatable = ['name', 'description'];
+
     /** Du moins au plus permissif : l'index sert à comparer deux tiers. */
     public const TIERS = ['classique', 'standard', 'premium'];
 

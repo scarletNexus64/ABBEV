@@ -78,9 +78,13 @@ return [
     |
     */
 
-    'locale' => env('APP_LOCALE', 'en'),
+    // Défaut FR : c'est la langue historique de l'API et celle du public
+    // principal. Un client qui n'envoie PAS d'`Accept-Language` reçoit donc
+    // exactement ce qu'il recevait avant l'introduction du middleware
+    // `SetLocale` — aucune régression pour les intégrations existantes.
+    'locale' => env('APP_LOCALE', 'fr'),
 
-    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
+    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'fr'),
 
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
 

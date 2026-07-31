@@ -19,10 +19,10 @@ class RubriqueResource extends JsonResource
     {
         return [
             'id' => (int) $this->id,
-            'name' => $this->name,
+            'name' => $this->t('name'),
             'slug' => $this->slug,
             'content_type' => $this->content_type,
-            'description' => $this->description,
+            'description' => $this->t('description'),
             'cover_url' => $this->absoluteUrl($this->cover_path),
         ];
     }

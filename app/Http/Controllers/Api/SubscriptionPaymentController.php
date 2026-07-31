@@ -112,7 +112,11 @@ class SubscriptionPaymentController extends Controller
 
                     return response()->json([
                         'success' => false,
-                        'message' => $result['message'],
+                        // Le message brut du service décrit une panne de
+                        // configuration serveur (« Stripe non configuré ») :
+                        // inutile pour l'utilisateur et jamais traduit. Le
+                        // détail reste dans les logs.
+                        'message' => __('messages.payment.init_failed'),
                     ], 400);
                 }
 
@@ -147,7 +151,7 @@ class SubscriptionPaymentController extends Controller
                     $transaction->update(['status' => 'failed']);
                     return response()->json([
                         'success' => false,
-                        'message' => 'Le paiement par carte n\'est pas disponible pour le moment.',
+                        'message' => __('messages.payment.card_unavailable'),
                     ], 503);
                 }
 
@@ -172,7 +176,7 @@ class SubscriptionPaymentController extends Controller
 
                     return response()->json([
                         'success' => false,
-                        'message' => $result['message'] ?? 'Échec de l\'initialisation Stripe',
+                        'message' => $result['message'] ?? __('messages.payment.stripe_init_failed'),
                     ], 400);
                 }
 
@@ -209,7 +213,7 @@ class SubscriptionPaymentController extends Controller
 
                     return response()->json([
                         'success' => false,
-                        'message' => "KPay n'est pas disponible dans votre pays ({$countryCode}).",
+                        'message' => __('messages.payment.kpay_country_unavailable', ['country' => $countryCode]),
                     ], 422);
                 }
 
@@ -221,7 +225,7 @@ class SubscriptionPaymentController extends Controller
 
                     return response()->json([
                         'success' => false,
-                        'message' => "Cet opérateur n'est pas disponible pour {$country['name']}.",
+                        'message' => __('messages.payment.operator_unavailable', ['country' => $country['name']]),
                     ], 422);
                 }
 
@@ -267,7 +271,7 @@ class SubscriptionPaymentController extends Controller
 
                     return response()->json([
                         'success' => false,
-                        'message' => $result['message'] ?? 'Échec de l\'initialisation KPay',
+                        'message' => $result['message'] ?? __('messages.payment.kpay_init_failed'),
                     ], 400);
                 }
 
@@ -306,7 +310,7 @@ class SubscriptionPaymentController extends Controller
                     'reference' => $kpayId,
                     'kpay_reference' => $kpayHumanRef,
                     'status' => $kpayData['status'] ?? 'pending',
-                    'message' => 'Veuillez valider le paiement sur votre téléphone',
+                    'message' => __('messages.payment.validate_on_phone'),
                 ]);
 
             } else {
@@ -323,7 +327,11 @@ class SubscriptionPaymentController extends Controller
                     $transaction->update(['status' => 'failed']);
                     return response()->json([
                         'success' => false,
-                        'message' => $result['message'],
+                        // Le message brut du service décrit une panne de
+                        // configuration serveur (« Stripe non configuré ») :
+                        // inutile pour l'utilisateur et jamais traduit. Le
+                        // détail reste dans les logs.
+                        'message' => __('messages.payment.init_failed'),
                     ], 400);
                 }
 
@@ -341,7 +349,7 @@ class SubscriptionPaymentController extends Controller
                     'payment_method' => 'freemopay',
                     'reference' => $result['reference'],
                     'status' => $result['status'],
-                    'message' => 'Veuillez composer le code USSD affiché sur votre téléphone',
+                    'message' => __('messages.payment.dial_ussd'),
                 ]);
             }
 
@@ -353,7 +361,7 @@ class SubscriptionPaymentController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de l\'initialisation du paiement',
+                'message' => __('messages.payment.init_failed'),
             ], 500);
         }
     }
@@ -420,7 +428,7 @@ class SubscriptionPaymentController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Paiement effectué avec succès',
+                'message' => __('messages.payment.succeeded'),
                 'transaction_id' => $transaction->transaction_id,
             ]);
 
@@ -432,7 +440,7 @@ class SubscriptionPaymentController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la capture du paiement',
+                'message' => __('messages.payment.capture_failed'),
             ], 500);
         }
     }
@@ -460,7 +468,7 @@ class SubscriptionPaymentController extends Controller
             if (!$result['success']) {
                 return response()->json([
                     'success' => false,
-                    'message' => $result['message'] ?? 'Vérification Stripe impossible',
+                    'message' => $result['message'] ?? __('messages.payment.stripe_verify_failed'),
                 ], 400);
             }
 
@@ -468,7 +476,7 @@ class SubscriptionPaymentController extends Controller
                 return response()->json([
                     'success' => true,
                     'status' => 'pending',
-                    'message' => 'Paiement en cours de traitement',
+                    'message' => __('messages.payment.processing'),
                 ]);
             }
 
@@ -480,7 +488,7 @@ class SubscriptionPaymentController extends Controller
             return response()->json([
                 'success' => true,
                 'status' => 'completed',
-                'message' => 'Paiement effectué avec succès',
+                'message' => __('messages.payment.succeeded'),
                 'transaction_id' => $transaction->transaction_id,
             ]);
         } catch (\Exception $e) {
@@ -491,7 +499,7 @@ class SubscriptionPaymentController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la confirmation du paiement',
+                'message' => __('messages.payment.confirm_failed'),
             ], 500);
         }
     }
@@ -513,7 +521,7 @@ class SubscriptionPaymentController extends Controller
             if (!$transaction) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Transaction introuvable',
+                    'message' => __('messages.payment.transaction_not_found'),
                 ], 404);
             }
 
@@ -534,7 +542,7 @@ class SubscriptionPaymentController extends Controller
                 return response()->json([
                     'success' => true,
                     'status' => 'completed',
-                    'message' => 'Paiement effectué avec succès',
+                    'message' => __('messages.payment.succeeded'),
                     'transaction_id' => $transaction->transaction_id,
                 ]);
             }
@@ -546,7 +554,7 @@ class SubscriptionPaymentController extends Controller
                 return response()->json([
                     'success' => false,
                     'status' => 'failed',
-                    'message' => 'Le paiement a échoué',
+                    'message' => __('messages.payment.failed'),
                     'reason' => $result['reason'] ?? null,
                 ]);
             }
@@ -555,7 +563,7 @@ class SubscriptionPaymentController extends Controller
             return response()->json([
                 'success' => true,
                 'status' => 'pending',
-                'message' => 'Paiement en cours de traitement',
+                'message' => __('messages.payment.processing'),
             ]);
 
         } catch (\Exception $e) {
@@ -566,7 +574,7 @@ class SubscriptionPaymentController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la vérification du statut',
+                'message' => __('messages.payment.status_check_failed'),
             ], 500);
         }
     }
@@ -614,7 +622,7 @@ class SubscriptionPaymentController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => $result['message'] ?? 'Vérification Apple échouée',
+                    'message' => $result['message'] ?? __('messages.payment.apple_verify_rejected'),
                 ], 400);
             }
 
@@ -642,7 +650,7 @@ class SubscriptionPaymentController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Transaction Apple invalide ou révoquée',
+                    'message' => __('messages.payment.apple_invalid'),
                 ], 400);
             }
 
@@ -657,7 +665,7 @@ class SubscriptionPaymentController extends Controller
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Plan introuvable pour ce produit Apple',
+                    'message' => __('messages.payment.apple_plan_missing'),
                 ], 422);
             }
 
@@ -669,7 +677,7 @@ class SubscriptionPaymentController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Abonnement activé',
+                'message' => __('messages.payment.subscription_activated'),
                 'transaction_id' => $transaction->transaction_id,
             ]);
         } catch (\Exception $e) {
@@ -680,7 +688,7 @@ class SubscriptionPaymentController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la vérification Apple',
+                'message' => __('messages.payment.apple_verify_failed'),
             ], 500);
         }
     }
@@ -938,7 +946,7 @@ class SubscriptionPaymentController extends Controller
             if (!$transaction) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Transaction introuvable',
+                    'message' => __('messages.payment.transaction_not_found'),
                 ], 404);
             }
 
@@ -949,7 +957,7 @@ class SubscriptionPaymentController extends Controller
             if (!$result['success']) {
                 return response()->json([
                     'success' => false,
-                    'message' => $result['message'] ?? 'Erreur lors de la vérification',
+                    'message' => $result['message'] ?? __('messages.payment.verify_failed'),
                 ], 400);
             }
 
@@ -961,7 +969,7 @@ class SubscriptionPaymentController extends Controller
                 return response()->json([
                     'success' => true,
                     'status' => 'completed',
-                    'message' => 'Paiement effectué avec succès',
+                    'message' => __('messages.payment.succeeded'),
                     'transaction_id' => $transaction->transaction_id,
                 ]);
             }
@@ -970,14 +978,14 @@ class SubscriptionPaymentController extends Controller
                 return response()->json([
                     'success' => false,
                     'status' => 'failed',
-                    'message' => 'Le paiement a échoué',
+                    'message' => __('messages.payment.failed'),
                 ]);
             }
 
             return response()->json([
                 'success' => true,
                 'status' => 'pending',
-                'message' => 'Paiement en cours de traitement',
+                'message' => __('messages.payment.processing'),
             ]);
 
         } catch (\Exception $e) {
@@ -988,7 +996,7 @@ class SubscriptionPaymentController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la vérification du statut',
+                'message' => __('messages.payment.status_check_failed'),
             ], 500);
         }
     }

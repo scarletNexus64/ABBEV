@@ -111,7 +111,7 @@ class AdminMediaApiController extends Controller
         }
         $media->delete();
 
-        return response()->json(['message' => 'Média supprimé.']);
+        return response()->json(['message' => __('messages.admin.media_deleted')]);
     }
 
     /** Slug unique (suffixe -2, -3… si déjà pris). */

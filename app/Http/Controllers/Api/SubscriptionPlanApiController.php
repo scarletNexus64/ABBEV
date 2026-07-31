@@ -83,19 +83,17 @@ class SubscriptionPlanApiController extends Controller
 
     private function transform(SubscriptionPlan $plan, Currency $currency): array
     {
-        $features = $plan->features;
-        if (is_string($features)) {
-            $decoded = json_decode($features, true);
-            $features = is_array($decoded) ? $decoded : [];
-        }
+        // `tArray` renvoie les puces traduites si une version existe pour la
+        // langue courante, sinon les puces d'origine — jamais un tableau vide.
+        $features = $plan->tArray('features');
 
         $priceXof = (float) $plan->price;
         $convertedPrice = $currency->convertFromXof($priceXof);
 
         return [
             'id' => (string) $plan->id,
-            'name' => $plan->name,
-            'description' => $plan->description ?? '',
+            'name' => $plan->t('name'),
+            'description' => $plan->t('description') ?? '',
             // Prix dans la devise demandée (déjà arrondi).
             'price' => $convertedPrice,
             'currency' => $currency->code,

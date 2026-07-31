@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Concerns\HasTranslations;
 
 /**
  * Document (PDF) d'une rubrique de type `oeuvre`, lu dans l'app via le
@@ -12,6 +13,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class Oeuvre extends Model
 {
+    use HasTranslations;
+
+    /** Champs exposés à l'app et traduits via la table `translations`. */
+    public array $translatable = ['title', 'description'];
+
     protected $fillable = [
         'rubrique_id', 'title', 'author', 'description', 'pages',
         'cover_path', 'file_path', 'is_active', 'sort_order',

@@ -51,7 +51,7 @@ class EpisodeApiController extends Controller
         }
         $season->delete();
 
-        return response()->json(['message' => 'Saison supprimée.']);
+        return response()->json(['message' => __('messages.admin.season_deleted')]);
     }
 
     // --- Admin : Épisodes ---
@@ -104,6 +104,6 @@ class EpisodeApiController extends Controller
         $episode->delete();
         $season?->updateEpisodesCount();
 
-        return response()->json(['message' => 'Épisode supprimé.']);
+        return response()->json(['message' => __('messages.admin.episode_deleted')]);
     }
 }

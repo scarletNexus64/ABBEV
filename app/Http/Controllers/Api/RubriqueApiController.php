@@ -69,14 +69,14 @@ class RubriqueApiController extends Controller
     public function contents(Request $request, Rubrique $rubrique): JsonResponse
     {
         if (! $rubrique->is_active) {
-            return response()->json(['message' => 'Rubrique introuvable.'], 404);
+            return response()->json(['message' => __('messages.content.rubrique_not_found')], 404);
         }
 
         // Re-vérifié ici et pas seulement dans index() : un ID de rubrique
         // verrouillée pourrait être appelé directement.
         if (! $rubrique->isAccessibleBy($this->resolveUser($request))) {
             return response()->json([
-                'message' => 'Cette rubrique nécessite un abonnement supérieur.',
+                'message' => __('messages.content.rubrique_upgrade'),
                 'required_tier' => $rubrique->required_tier,
             ], 403);
         }

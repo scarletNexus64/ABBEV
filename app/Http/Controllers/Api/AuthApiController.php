@@ -35,15 +35,15 @@ class AuthApiController extends Controller
             'country_code' => 'required|string|size:2|exists:countries,code',
             'currency_code' => 'nullable|string|size:3|exists:currencies,code',
         ], [
-            'name.required'      => 'Le nom est requis.',
-            'email.required'     => "L'adresse email est requise.",
-            'email.email'        => "L'adresse email n'est pas valide.",
-            'email.unique'       => 'Cette adresse email est déjà utilisée.',
-            'password.required'  => 'Le mot de passe est requis.',
-            'password.min'       => 'Le mot de passe doit contenir au moins 8 caractères.',
-            'password.confirmed' => 'Les mots de passe ne correspondent pas.',
-            'country_code.required' => 'Veuillez sélectionner votre pays.',
-            'country_code.exists'   => 'Pays invalide.',
+            'name.required'      => __('messages.validation.name_required'),
+            'email.required'     => __('messages.validation.email_required'),
+            'email.email'        => __('messages.validation.email_invalid'),
+            'email.unique'       => __('messages.validation.email_taken'),
+            'password.required'  => __('messages.validation.password_required'),
+            'password.min'       => __('messages.validation.password_min'),
+            'password.confirmed' => __('messages.validation.password_confirmed'),
+            'country_code.required' => __('messages.validation.country_required'),
+            'country_code.exists'   => __('messages.validation.country_invalid'),
         ]);
 
         $locale = $this->resolveLocale($data['country_code'], $data['currency_code'] ?? null);
@@ -158,7 +158,7 @@ class AuthApiController extends Controller
             );
 
             return response()->json([
-                'message' => 'Code envoyé par email',
+                'message' => __('messages.auth.otp_sent'),
             ]);
         }
 
@@ -186,11 +186,11 @@ class AuthApiController extends Controller
             );
 
             return response()->json([
-                'message' => 'Code envoyé par email',
+                'message' => __('messages.auth.otp_sent'),
             ]);
         } catch (\Throwable $e) {
             return response()->json([
-                'message' => "Erreur lors de l'envoi de l'email. Veuillez réessayer.",
+                'message' => __('messages.auth.otp_send_failed'),
                 'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
@@ -275,7 +275,7 @@ class AuthApiController extends Controller
         // Compte suspendu par un admin → accès refusé (aucun token émis).
         if (! $user->is_active) {
             return response()->json([
-                'message' => 'Ce compte a été suspendu. Contactez le support.',
+                'message' => __('messages.auth.account_suspended'),
             ], 403);
         }
 
@@ -345,7 +345,7 @@ class AuthApiController extends Controller
         }
 
         return response()->json([
-            'message' => 'Si un compte existe pour cet email, un code de réinitialisation a été envoyé.',
+            'message' => __('messages.auth.reset_code_sent'),
         ]);
     }
 
@@ -372,7 +372,7 @@ class AuthApiController extends Controller
             ]);
         }
 
-        return response()->json(['message' => 'Code valide.', 'valid' => true]);
+        return response()->json(['message' => __('messages.auth.code_valid'), 'valid' => true]);
     }
 
     /**
@@ -410,7 +410,7 @@ class AuthApiController extends Controller
 
         if (! $user->is_active) {
             return response()->json([
-                'message' => 'Ce compte a été suspendu. Contactez le support.',
+                'message' => __('messages.auth.account_suspended'),
             ], 403);
         }
 
@@ -428,7 +428,7 @@ class AuthApiController extends Controller
             'user' => $user,
             'token' => $token,
             'token_type' => 'Bearer',
-            'message' => 'Mot de passe réinitialisé avec succès.',
+            'message' => __('messages.auth.password_reset'),
         ]);
     }
 
@@ -704,7 +704,7 @@ class AuthApiController extends Controller
         );
 
         return response()->json([
-            'message' => 'Historique enregistré.',
+            'message' => __('messages.auth.history_saved'),
             'watch_history' => $history,
         ]);
     }
@@ -717,7 +717,7 @@ class AuthApiController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([
-            'message' => 'Déconnexion réussie.',
+            'message' => __('messages.auth.logged_out'),
         ]);
     }
 }

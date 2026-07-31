@@ -29,7 +29,7 @@ class WatchApiController extends Controller
     public function movie(Request $request, Media $movie): JsonResponse
     {
         if ($movie->type !== 'movie') {
-            return response()->json(['message' => 'Contenu introuvable.'], 404);
+            return response()->json(['message' => __('messages.content.not_found')], 404);
         }
 
         if ($denied = $this->guard($request, 'movie', $movie->id)) {
@@ -95,7 +95,7 @@ class WatchApiController extends Controller
                 'media_id' => $movie->id,
                 'type'     => $movie->type,
             ]);
-            return response()->json(['message' => 'Contenu introuvable.'], 404);
+            return response()->json(['message' => __('messages.content.not_found')], 404);
         }
 
         if ($denied = $this->guard($request, 'movie', $movie->id)) {
@@ -149,7 +149,7 @@ class WatchApiController extends Controller
                 'type' => $type,
                 'id'   => $id,
             ]);
-            return response()->json(['message' => 'Non authentifié.'], 401);
+            return response()->json(['message' => __('messages.auth.unauthenticated')], 401);
         }
 
         if (! $user->hasActiveSubscription()) {
@@ -161,7 +161,7 @@ class WatchApiController extends Controller
 
             return response()->json([
                 'error' => 'subscription_required',
-                'message' => 'Un abonnement actif est requis pour visionner ce contenu.',
+                'message' => __('messages.content.subscription_required'),
             ], 403);
         }
 
@@ -341,7 +341,7 @@ class WatchApiController extends Controller
 
             return response()->json([
                 'error'   => 'no_downloadable_source',
-                'message' => 'Ce contenu n\'est pas disponible en téléchargement.',
+                'message' => __('messages.content.download_unavailable'),
             ], 422);
         }
 
@@ -366,8 +366,7 @@ class WatchApiController extends Controller
             ]);
             return response()->json([
                 'error'   => 'download_signing_disabled',
-                'message' => 'Le téléchargement n\'est pas disponible '
-                    . '(configuration serveur incomplète).',
+                'message' => __('messages.content.download_misconfigured'),
             ], 503);
         }
 
@@ -450,7 +449,7 @@ class WatchApiController extends Controller
 
             return response()->json([
                 'error'   => 'download_unavailable',
-                'message' => 'Le téléchargement n\'est pas disponible pour le moment.',
+                'message' => __('messages.content.download_disabled'),
             ], 500);
         }
     }

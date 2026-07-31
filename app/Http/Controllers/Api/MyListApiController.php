@@ -52,7 +52,7 @@ class MyListApiController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'Ajouté à votre liste.',
+            'message' => __('messages.list.added'),
             'in_list' => true,
         ], 201);
     }
@@ -68,7 +68,7 @@ class MyListApiController extends Controller
             ->delete();
 
         return response()->json([
-            'message' => 'Retiré de votre liste.',
+            'message' => __('messages.list.removed'),
             'in_list' => false,
         ]);
     }

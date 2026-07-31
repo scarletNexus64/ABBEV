@@ -4,9 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\HasTranslations;
 
 class TicketType extends Model
 {
+    use HasTranslations;
+
+    /** Champs exposés à l'app et traduits via la table `translations`. */
+    public array $translatable = ['name'];
+
     use HasFactory;
 
     protected $fillable = [

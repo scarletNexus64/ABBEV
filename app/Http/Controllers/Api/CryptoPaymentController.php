@@ -86,7 +86,7 @@ class CryptoPaymentController extends Controller
         if (! $this->crypto->isConfigured()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Le paiement crypto n\'est pas disponible pour le moment.',
+                'message' => __('messages.payment.crypto_unavailable'),
             ], 503);
         }
 
@@ -118,7 +118,7 @@ class CryptoPaymentController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => $result['message'] ?? 'Impossible d\'initier le paiement crypto.',
+                'message' => $result['message'] ?? __('messages.payment.crypto_init_failed'),
             ], 400);
         }
 
@@ -161,7 +161,7 @@ class CryptoPaymentController extends Controller
             ->first();
 
         if (! $transaction) {
-            return response()->json(['success' => false, 'message' => 'Transaction introuvable.'], 404);
+            return response()->json(['success' => false, 'message' => __('messages.payment.transaction_not_found')], 404);
         }
 
         return match ($transaction->status) {
@@ -169,12 +169,12 @@ class CryptoPaymentController extends Controller
             'failed', 'cancelled' => response()->json([
                 'success' => false,
                 'status'  => $transaction->status,
-                'message' => 'Le paiement a échoué.',
+                'message' => __('messages.payment.failed'),
             ]),
             default => response()->json([
                 'success' => true,
                 'status'  => 'pending',
-                'message' => 'Paiement crypto en cours de traitement.',
+                'message' => __('messages.payment.crypto_processing'),
             ]),
         };
     }
