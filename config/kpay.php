@@ -52,12 +52,14 @@ return [
             'flag' => '🇨🇩',
             'dial' => '243',
             'operators' => [
-                ['code' => 'AIRTEL_COD_CDF', 'label' => 'Airtel Money', 'currency' => 'CDF'],
-                ['code' => 'ORANGE_COD_CDF', 'label' => 'Orange Money', 'currency' => 'CDF'],
-                ['code' => 'VODACOM_COD_CDF', 'label' => 'Vodacom M-Pesa', 'currency' => 'CDF'],
-                ['code' => 'AIRTEL_COD_USD', 'label' => 'Airtel Money (USD)', 'currency' => 'USD'],
-                ['code' => 'ORANGE_COD_USD', 'label' => 'Orange Money (USD)', 'currency' => 'USD'],
-                ['code' => 'VODACOM_COD_USD', 'label' => 'Vodacom M-Pesa (USD)', 'currency' => 'USD'],
+                // Codes EXACTS du catalogue KPay. Les anciens suffixes de
+                // devise (`_CDF` / `_USD`) n'existent pas côté API : la devise
+                // est DÉDUITE du provider et n'est jamais transmise, donc un
+                // code suffixé faisait échouer l'init en 400. La RDC gère CDF
+                // et USD sur le même provider, arbitrés par KPay.
+                ['code' => 'AIRTEL_COD', 'label' => 'Airtel Money', 'currency' => 'CDF'],
+                ['code' => 'ORANGE_COD', 'label' => 'Orange Money', 'currency' => 'CDF'],
+                ['code' => 'VODACOM_MPESA_COD', 'label' => 'Vodacom M-Pesa', 'currency' => 'CDF'],
             ],
         ],
         'CG' => [
@@ -116,7 +118,7 @@ return [
             'flag' => '🇺🇬',
             'dial' => '256',
             'operators' => [
-                ['code' => 'AIRTEL_UGA', 'label' => 'Airtel Money', 'currency' => 'UGX'],
+                ['code' => 'AIRTEL_OAPI_UGA', 'label' => 'Airtel Money', 'currency' => 'UGX'],
                 ['code' => 'MTN_MOMO_UGA', 'label' => 'MTN MoMo', 'currency' => 'UGX'],
             ],
         ],

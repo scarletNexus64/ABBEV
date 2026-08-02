@@ -17,6 +17,14 @@ Route::get('/media/img/{path}', App\Http\Controllers\PublicImageController::clas
     ->where('path', '.*')
     ->name('public.image');
 
+// Pages légales publiques (aucune authentification). Liées depuis l'écran
+// d'abonnement de l'app et vérifiées par le reviewer Apple : les URLs ne
+// doivent plus changer une fois l'app soumise.
+Route::get('/conditions-utilisation', [App\Http\Controllers\LegalController::class, 'terms'])
+    ->name('legal.terms');
+Route::get('/confidentialite', [App\Http\Controllers\LegalController::class, 'privacy'])
+    ->name('legal.privacy');
+
 // Root redirect to admin login
 Route::get('/', function () {
     return redirect()->route('admin.login');

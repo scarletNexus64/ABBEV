@@ -586,7 +586,19 @@ class SubscriptionPaymentController extends Controller
     {
         // Provisionnement centralisé : gère souscription ET
         // renouvellement (cumul des jours), idempotent.
-        UserSubscription::provisionFromTransaction($transaction);
+        $subscription = UserSubscription::provisionFromTransaction($transaction);
+
+        // Étape finale du parcours, tous moyens de paiement confondus : c'est
+        // elle qui ouvre réellement l'accès. La tracer permet de distinguer
+        // « le paiement a abouti mais l'accès n'est pas ouvert » de « le
+        // paiement lui-même a échoué » — deux pannes très différentes.
+        Log::info('[SubscriptionPayment] 🎟️ Abonnement provisionné', [
+            'user_id' => $transaction->user_id,
+            'moyen_paiement' => $transaction->payment_method,
+            'transaction_id' => $transaction->transaction_id,
+            'plan' => $transaction->metadata['plan_name'] ?? null,
+            'expire_le' => $subscription?->expires_at?->toDateTimeString(),
+        ]);
     }
 
     /**
@@ -758,6 +770,13 @@ class SubscriptionPaymentController extends Controller
         $productId = $payload['productId'] ?? null;
 
         if (!$appleTxId || !$productId) {
+            Log::warning('[SubscriptionPayment] Apple — payload incomplet, provisionnement abandonné', [
+                'user_id' => $userId,
+                'transaction_id_present' => (bool) $appleTxId,
+                'product_id_present' => (bool) $productId,
+                'cles_payload' => array_keys($payload),
+            ]);
+
             return null;
         }
 
@@ -780,7 +799,31 @@ class SubscriptionPaymentController extends Controller
             ->where('payment_method', 'apple_iap')
             ->first();
 
+        if ($transaction) {
+            // Rejeu d'une transaction déjà provisionnée : cas NORMAL. Apple
+            // re-livre une transaction tant que `completePurchase()` n'a pas
+            // été appelé, et la restauration d'achats repasse ici aussi.
+            // L'abonnement n'est pas recréé — sans ce log, la trace donnerait
+            // l'illusion d'un achat ignoré.
+            Log::info('[SubscriptionPayment] Apple — transaction déjà provisionnée, aucune action', [
+                'user_id' => $userId,
+                'apple_transaction_id' => $appleTxId,
+                'transaction_id' => $transaction->transaction_id,
+                'plan' => $plan->name,
+            ]);
+        }
+
         if (!$transaction) {
+            Log::info('[SubscriptionPayment] Apple — provisionnement d\'un nouvel abonnement', [
+                'user_id' => $userId,
+                'apple_transaction_id' => $appleTxId,
+                'product_id' => $productId,
+                'plan' => $plan->name,
+                'tier' => $plan->tier,
+                'montant' => $plan->price,
+                'duree_jours' => $plan->duration_days,
+            ]);
+
             $transaction = Transaction::create([
                 'user_id' => $userId,
                 'transaction_id' => 'TXN-' . strtoupper(Str::random(12)),

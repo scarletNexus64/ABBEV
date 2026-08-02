@@ -108,6 +108,11 @@ class SubscriptionPlanApiController extends Controller
             'durationInDays' => (int) $plan->duration_days,
             'features' => array_values($features ?? []),
             'isPopular' => (bool) $plan->is_popular,
+            // Product ID App Store Connect. Sur iOS l'app l'utilise pour
+            // déclencher l'achat StoreKit du bon plan ; `null` signale un plan
+            // non vendu en IAP, que l'app doit masquer sur iOS plutôt que de
+            // proposer un achat qui échouerait.
+            'appleProductId' => $plan->apple_product_id,
         ];
     }
 }

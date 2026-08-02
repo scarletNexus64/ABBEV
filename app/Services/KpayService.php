@@ -156,11 +156,14 @@ class KpayService
      */
     public function initPayment(array $params): array
     {
-        // Mapper l'opérateur interne vers le code provider KPay selon le pays
-        // (`country` = code ISO2 optionnel ; repli Cameroun sinon).
+        // L'API attend `provider` avec le CODE DU CATALOGUE (« ORANGE_CMR »,
+        // « MTN_MOMO_CMR »…) : le pays et la devise en sont déduits. Il n'y a
+        // pas de champ `paymentMethod` — l'envoyer fait échouer l'init avec
+        // « property paymentMethod should not exist ».
         if (isset($params['provider'])) {
             $params['provider'] = $this->providerFor($params['provider'], $params['country'] ?? null);
         }
+
         // `country` est interne : jamais transmis à KPay.
         unset($params['country']);
 
@@ -168,6 +171,7 @@ class KpayService
             'externalId' => $params['externalId'] ?? null,
             'amount' => $params['amount'] ?? null,
             'provider' => $params['provider'] ?? null,
+            'phoneNumber' => $params['phoneNumber'] ?? null,
         ]);
 
         return $this->request('POST', '/api/v1/payments/init', $params);

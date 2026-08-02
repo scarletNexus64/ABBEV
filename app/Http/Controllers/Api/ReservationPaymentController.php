@@ -221,7 +221,15 @@ class ReservationPaymentController extends Controller
             'amount'        => (int) $transaction->amount,
             'provider'      => $operator,
             'country'       => $countryCode,
-            'phoneNumber'   => $validated['phone_number'],
+            // KPay exige le format international (« 2376XXXXXXXX ») ; le mobile
+            // saisit un numéro LOCAL (« 6XXXXXXXX ») sous l'indicatif affiché.
+            // Sans cette normalisation, KPay rejette l'init et la transaction
+            // repasse FAILED en une seconde, avant même le prompt USSD.
+            // Repli sur l'indicatif Cameroun quand le pays est hors catalogue.
+            'phoneNumber'   => KpayService::normalizeMsisdn(
+                $validated['phone_number'],
+                $country['dial'] ?? '237',
+            ),
             'externalId'    => $transaction->transaction_id,
         ]);
 

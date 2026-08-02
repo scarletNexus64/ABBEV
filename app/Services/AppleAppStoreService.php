@@ -34,6 +34,19 @@ class AppleAppStoreService
         $this->issuerId = $cfg['issuer_id'] ?? null;
         $this->keyId = $cfg['key_id'] ?? null;
         $this->sandbox = (bool) ($cfg['sandbox'] ?? true);
+
+        // Trace l'état de la configuration à chaque instanciation. Une clé
+        // absente ne se manifeste sinon qu'au premier achat réel, sous la
+        // forme d'un « Configuration Apple IAP invalide » sans détail : ce
+        // récapitulatif dit immédiatement LAQUELLE des valeurs manque.
+        // Aucun secret n'est journalisé, seulement leur présence.
+        Log::info('[AppleIAP] Configuration chargée', [
+            'bundle_id' => $this->bundleId,
+            'issuer_id' => $this->issuerId ? 'défini' : 'MANQUANT',
+            'key_id' => $this->keyId ?: 'MANQUANT',
+            'private_key' => $this->resolvePrivateKey() ? 'lisible' : 'MANQUANTE/ILLISIBLE',
+            'environnement' => $this->sandbox ? 'sandbox (bascule prod si 4xx)' : 'production (bascule sandbox si 4xx)',
+        ]);
     }
 
     /**
@@ -307,13 +320,37 @@ class AppleAppStoreService
     public function isTransactionValid(array $payload): bool
     {
         if (($payload['bundleId'] ?? null) !== $this->bundleId) {
+            // Cause n°1 des rejets en développement : le bundle ID de l'app
+            // installée ne correspond pas à APPLE_IAP_BUNDLE_ID côté serveur.
+            Log::warning('[AppleIAP] ❌ Transaction rejetée — bundleId différent', [
+                'bundle_id_reçu' => $payload['bundleId'] ?? null,
+                'bundle_id_attendu' => $this->bundleId,
+                'transaction_id' => $payload['transactionId'] ?? null,
+            ]);
+
             return false;
         }
 
         // Remboursée / révoquée : Apple positionne revocationDate.
         if (!empty($payload['revocationDate'])) {
+            Log::warning('[AppleIAP] ❌ Transaction rejetée — achat révoqué/remboursé', [
+                'transaction_id' => $payload['transactionId'] ?? null,
+                'revocation_date' => $payload['revocationDate'],
+                'revocation_reason' => $payload['revocationReason'] ?? null,
+            ]);
+
             return false;
         }
+
+        Log::info('[AppleIAP] ✅ Transaction valide', [
+            'transaction_id' => $payload['transactionId'] ?? null,
+            'product_id' => $payload['productId'] ?? null,
+            'type' => $payload['type'] ?? null,
+            'environnement' => $payload['environment'] ?? null,
+            'expire_le' => isset($payload['expiresDate'])
+                ? date('Y-m-d H:i:s', (int) ($payload['expiresDate'] / 1000))
+                : null,
+        ]);
 
         return true;
     }

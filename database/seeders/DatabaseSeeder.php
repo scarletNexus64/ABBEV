@@ -21,7 +21,7 @@ class DatabaseSeeder extends Seeder
             AdminUserSeeder::class,
             CategorySeeder::class,
             MediaSeeder::class,
-            SubscriptionPlanSeeder::class,
+            AppleInAppPurchasePlanSeeder::class,
             ConfigurationSeeder::class,
             ScreeningSeeder::class,
             RubriqueSeeder::class,
