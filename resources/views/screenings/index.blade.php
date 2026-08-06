@@ -88,13 +88,16 @@
                     <td class="px-6 py-4 text-gray-300">
                         <div>{{ $s->cinema_name }}</div>
                         <div class="text-gray-500 text-xs">{{ $s->location }}</div>
+                        @if($s->country)
+                        <div class="text-gray-500 text-xs mt-1">{{ $s->country->flag_emoji }} {{ $s->country->name }}</div>
+                        @endif
                     </td>
                     <td class="px-6 py-4 text-gray-300">{{ $s->starts_at->format('d/m/Y H:i') }}</td>
                     <td class="px-6 py-4 text-gray-300">
                         @forelse($s->ticketTypes as $t)
                         <div class="flex items-center gap-2 text-xs mb-1">
                             <span class="px-2 py-0.5 rounded bg-dark-50 text-gray-200">{{ $t->name }}</span>
-                            <span class="text-primary-400">{{ number_format($t->price) }} XAF</span>
+                            <span class="text-primary-400">{{ number_format($t->price, $t->currency === 'XAF' || $t->currency === 'XOF' ? 0 : 2) }} {{ $t->currency }}</span>
                             <span class="text-gray-500">{{ $t->sold_seats }}/{{ $t->capacity }} vendues</span>
                         </div>
                         @empty

@@ -321,6 +321,12 @@
                         <i class="fas fa-tv w-5 mr-3"></i>
                         Séries
                     </a>
+                    <a href="{{ route('oeuvres.index') }}"
+                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('oeuvres.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
+                        <i class="fas fa-book w-5 mr-3"></i>
+                        Oeuvres adaptables
+                    </a>
+
                     @endunless
 
                     @if(auth()->user()->isAdmin() || auth()->user()->isAssistant())

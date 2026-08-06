@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CryptoPaymentController;
 use App\Http\Controllers\Api\EpisodeApiController;
 use App\Http\Controllers\Api\LocaleApiController;
 use App\Http\Controllers\Api\LocalVideoStreamController;
+use App\Http\Controllers\Api\OeuvreFileController;
 use App\Http\Controllers\Api\MediaApiController;
 use App\Http\Controllers\Api\MyListApiController;
 use App\Http\Controllers\Api\ReservationPaymentController;
@@ -150,6 +151,11 @@ Route::prefix('v1')->group(function () {
     // le guard sanctum pour filtrer celles qui exigent un abonnement.
     Route::get('/rubriques',                       [RubriqueApiController::class, 'index']);
     Route::get('/rubriques/{rubrique}/contents',   [RubriqueApiController::class, 'contents']);
+
+    // PDF d'une oeuvre — URL signee temporaire (pas besoin de header Authorization).
+    Route::get('/oeuvres/{oeuvre}/file', OeuvreFileController::class)
+        ->middleware('signed')
+        ->name('api.oeuvres.file');
 
     // -------------------------------------------------------------
     // PUBLIC — catégories / recherche / featured global

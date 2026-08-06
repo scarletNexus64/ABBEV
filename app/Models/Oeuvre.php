@@ -19,8 +19,8 @@ class Oeuvre extends Model
     public array $translatable = ['title', 'description'];
 
     protected $fillable = [
-        'rubrique_id', 'title', 'author', 'description', 'pages',
-        'cover_path', 'file_path', 'is_active', 'sort_order',
+        'rubrique_id', 'title', 'slug', 'author', 'description', 'pages',
+        'cover_path', 'file_path', 'is_active', 'sort_order', 'published_at',
     ];
 
     protected $casts = [
