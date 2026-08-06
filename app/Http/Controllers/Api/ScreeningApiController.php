@@ -35,6 +35,12 @@ class ScreeningApiController extends Controller
             ->where('status', 'published')
             ->where('starts_at', '>=', now());
 
+        // Filtrer par pays du user connecté : n'afficher que les séances de son pays.
+        $user = $request->user();
+        if ($user && $user->country_code) {
+            $query->where('country_code', $user->country_code);
+        }
+
         // Recherche plein-texte simple (film / cinéma / lieu).
         if ($q = trim((string) $request->query('q', ''))) {
             $query->where(function ($sub) use ($q) {
@@ -201,6 +207,7 @@ class ScreeningApiController extends Controller
             'movie_title'  => $s->movie_title,
             'cinema_name'  => $s->cinema_name,
             'location'     => $s->location,
+            'country_code' => $s->country_code,
             'starts_at'    => $s->starts_at->toIso8601String(),
             'ticket_types' => $s->ticketTypes->map(fn (TicketType $t) => [
                 'id'              => $t->id,

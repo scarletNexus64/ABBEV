@@ -15,6 +15,7 @@ class Screening extends Model
         'movie_title',
         'cinema_name',
         'location',
+        'country_code',
         'starts_at',
         'status',
         'created_by',
@@ -45,6 +46,11 @@ class Screening extends Model
     public function reservations()
     {
         return $this->hasMany(Reservation::class);
+    }
+
+    public function country()
+    {
+        return $this->belongsTo(Country::class, 'country_code', 'code');
     }
 
     /**

@@ -110,6 +110,7 @@ class ReservationPaymentController extends Controller
 
         $result = $this->stripe->createPaymentIntent([
             'amount'      => (float) $transaction->amount,
+            'currency'    => $transaction->currency,
             'description' => $transaction->description,
             'metadata'    => [
                 'transaction_id' => $transaction->transaction_id,

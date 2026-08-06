@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Country;
 use App\Models\Media;
 use App\Models\Screening;
 use App\Models\TicketType;
@@ -13,7 +14,7 @@ class ScreeningController extends Controller
 {
     public function index()
     {
-        $screenings = Screening::with(['media', 'ticketTypes'])
+        $screenings = Screening::with(['media', 'ticketTypes', 'country'])
             ->withCount(['reservations as confirmed_reservations' => fn ($q) => $q->where('status', 'confirmed')])
             ->orderByDesc('starts_at')
             ->get();
@@ -31,8 +32,9 @@ class ScreeningController extends Controller
     public function create()
     {
         $movies = Media::where('type', 'movie')->orderBy('title')->get(['id', 'title']);
+        $countries = Country::with('currency')->where('is_active', true)->orderBy('name')->get();
 
-        return view('screenings.create', compact('movies'));
+        return view('screenings.create', compact('movies', 'countries'));
     }
 
     public function store(Request $request)
@@ -42,16 +44,18 @@ class ScreeningController extends Controller
 
         DB::transaction(function () use ($validated, $request) {
             $screening = Screening::create([
-                'media_id'    => $validated['media_id'] ?? null,
-                'movie_title' => $validated['movie_title'],
-                'cinema_name' => $validated['cinema_name'],
-                'location'    => $validated['location'],
-                'starts_at'   => $validated['starts_at'],
-                'status'      => $request->input('status', 'published'),
-                'created_by'  => $request->user()->id,
+                'media_id'     => $validated['media_id'] ?? null,
+                'movie_title'  => $validated['movie_title'],
+                'cinema_name'  => $validated['cinema_name'],
+                'location'     => $validated['location'],
+                'country_code' => $validated['country_code'],
+                'starts_at'    => $validated['starts_at'],
+                'status'       => $request->input('status', 'published'),
+                'created_by'   => $request->user()->id,
             ]);
 
-            $this->syncTicketTypes($screening, $validated['ticket_types']);
+            $currency = $this->currencyForCountry($validated['country_code']);
+            $this->syncTicketTypes($screening, $validated['ticket_types'], $currency);
         });
 
         return redirect()->route('screenings.index')
@@ -62,8 +66,9 @@ class ScreeningController extends Controller
     {
         $screening->load('ticketTypes');
         $movies = Media::where('type', 'movie')->orderBy('title')->get(['id', 'title']);
+        $countries = Country::with('currency')->where('is_active', true)->orderBy('name')->get();
 
-        return view('screenings.edit', compact('screening', 'movies'));
+        return view('screenings.edit', compact('screening', 'movies', 'countries'));
     }
 
     public function update(Request $request, Screening $screening)
@@ -73,15 +78,17 @@ class ScreeningController extends Controller
 
         DB::transaction(function () use ($validated, $request, $screening) {
             $screening->update([
-                'media_id'    => $validated['media_id'] ?? null,
-                'movie_title' => $validated['movie_title'],
-                'cinema_name' => $validated['cinema_name'],
-                'location'    => $validated['location'],
-                'starts_at'   => $validated['starts_at'],
-                'status'      => $request->input('status', $screening->status),
+                'media_id'     => $validated['media_id'] ?? null,
+                'movie_title'  => $validated['movie_title'],
+                'cinema_name'  => $validated['cinema_name'],
+                'location'     => $validated['location'],
+                'country_code' => $validated['country_code'],
+                'starts_at'    => $validated['starts_at'],
+                'status'       => $request->input('status', $screening->status),
             ]);
 
-            $this->syncTicketTypes($screening, $validated['ticket_types']);
+            $currency = $this->currencyForCountry($validated['country_code']);
+            $this->syncTicketTypes($screening, $validated['ticket_types'], $currency);
         });
 
         return redirect()->route('screenings.index')
@@ -116,7 +123,7 @@ class ScreeningController extends Controller
      *
      * @param  array<int,array<string,mixed>>  $rows
      */
-    private function syncTicketTypes(Screening $screening, array $rows): void
+    private function syncTicketTypes(Screening $screening, array $rows, string $currency = 'XAF'): void
     {
         $keptIds = [];
 
@@ -134,6 +141,7 @@ class ScreeningController extends Controller
                     'name'     => $row['name'],
                     'price'    => $row['price'],
                     'capacity' => $capacity,
+                    'currency' => $currency,
                 ]);
                 $keptIds[] = $type->id;
             } else {
@@ -141,7 +149,7 @@ class ScreeningController extends Controller
                     'name'     => $row['name'],
                     'price'    => $row['price'],
                     'capacity' => (int) $row['capacity'],
-                    'currency' => 'XAF',
+                    'currency' => $currency,
                 ]);
                 $keptIds[] = $type->id;
             }
@@ -155,6 +163,11 @@ class ScreeningController extends Controller
             ->delete();
     }
 
+    private function currencyForCountry(string $countryCode): string
+    {
+        return Country::where('code', $countryCode)->value('currency_code') ?? 'XAF';
+    }
+
     /**
      * @return array<string,mixed>
      */
@@ -165,6 +178,7 @@ class ScreeningController extends Controller
             'movie_title'           => 'nullable|string|max:255',
             'cinema_name'           => 'required|string|max:255',
             'location'              => 'required|string|max:255',
+            'country_code'          => 'required|string|size:2|exists:countries,code',
             'starts_at'             => 'required|date',
             'status'                => 'nullable|in:draft,published,canceled',
             'ticket_types'          => 'required|array|min:1',

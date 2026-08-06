@@ -8,6 +8,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\EpisodeController;
 use App\Http\Controllers\ProducerController;
+use App\Http\Controllers\OeuvreController;
 use App\Http\Controllers\ScreeningController;
 use Illuminate\Support\Facades\Route;
 
@@ -71,6 +72,7 @@ Route::middleware(['auth', 'role:admin,assistant'])->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'role:admin,producer'])->group(function () {
+    Route::resource('oeuvres', OeuvreController::class);
     Route::resource('media', MediaController::class);
 
     // Episodes Management for Series

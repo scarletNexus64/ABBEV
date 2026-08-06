@@ -1,9 +1,10 @@
 {{-- Champs partagés création / édition d'une séance.
-     Attend : $screening (nullable), $movies --}}
+     Attend : $screening (nullable), $movies, $countries --}}
 @php($s = $screening ?? null)
 @php($existingTypes = old('ticket_types', $s ? $s->ticketTypes->map(fn($t) => [
         'id' => $t->id, 'name' => $t->name, 'price' => $t->price, 'capacity' => $t->capacity, 'sold' => $t->sold_seats,
     ])->values()->all() : [['id' => null, 'name' => 'Standard', 'price' => 3000, 'capacity' => 100, 'sold' => 0]]))
+@php($countriesJson = $countries->map(fn($c) => ['code' => $c->code, 'name' => $c->name, 'flag' => $c->flag_emoji, 'currency' => $c->currency_code])->values())
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Left -->
@@ -57,6 +58,28 @@
                    placeholder="Ex: Bessengue, Douala"
                    class="w-full bg-dark-50 border @error('location') border-red-500 @else border-dark-200 @enderror rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition">
             @error('location')
+            <p class="mt-2 text-sm text-red-400"><i class="fas fa-exclamation-circle mr-1"></i> {{ $message }}</p>
+            @enderror
+        </div>
+
+        <!-- Pays -->
+        <div class="mb-6" x-data="countryPicker()" x-init="init()">
+            <label for="country_code" class="block text-sm font-medium text-gray-300 mb-2">Pays de la séance <span class="text-red-400">*</span></label>
+            <select name="country_code" id="country_code" required x-model="selected" @change="onCountryChange()"
+                    class="w-full bg-dark-50 border @error('country_code') border-red-500 @else border-dark-200 @enderror rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition">
+                <option value="">— Choisir un pays —</option>
+                @foreach($countries as $country)
+                <option value="{{ $country->code }}" {{ (string) old('country_code', $s->country_code ?? 'CM') === (string) $country->code ? 'selected' : '' }}>
+                    {{ $country->flag_emoji }} {{ $country->name }} ({{ $country->currency_code }})
+                </option>
+                @endforeach
+            </select>
+            <p class="mt-2 text-sm text-gray-400">
+                <i class="fas fa-info-circle mr-1"></i>
+                Devise des tickets : <strong class="text-primary-400" x-text="currencyLabel"></strong>
+                — seuls les utilisateurs de ce pays verront cette séance.
+            </p>
+            @error('country_code')
             <p class="mt-2 text-sm text-red-400"><i class="fas fa-exclamation-circle mr-1"></i> {{ $message }}</p>
             @enderror
         </div>
@@ -119,7 +142,7 @@
                 </div>
 
                 <div class="col-span-6 md:col-span-3">
-                    <label class="block text-xs text-gray-400 mb-1">Prix (XAF)</label>
+                    <label class="block text-xs text-gray-400 mb-1">Prix (<span class="ticket-currency-label">XAF</span>)</label>
                     <input type="number" min="0" step="1" :name="`ticket_types[${index}][price]`" x-model="row.price" required
                            class="w-full bg-dark-100 border border-dark-200 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-500">
                 </div>
@@ -160,6 +183,27 @@ function ticketTypes() {
         remove(index) {
             if (this.rows[index].sold > 0) return;
             this.rows.splice(index, 1);
+        },
+    };
+}
+
+function countryPicker() {
+    const countries = @json($countriesJson);
+    return {
+        selected: @json(old('country_code', $s->country_code ?? 'CM')),
+        currencyLabel: '',
+        init() {
+            this.updateCurrency();
+        },
+        onCountryChange() {
+            this.updateCurrency();
+        },
+        updateCurrency() {
+            const c = countries.find(c => c.code === this.selected);
+            this.currencyLabel = c ? c.currency : '—';
+            document.querySelectorAll('.ticket-currency-label').forEach(el => {
+                el.textContent = this.currencyLabel;
+            });
         },
     };
 }

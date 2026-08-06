@@ -157,6 +157,7 @@ class SubscriptionPaymentController extends Controller
 
                 $result = $this->stripeService->createPaymentIntent([
                     'amount'      => (float) $plan->price,
+                    'currency'    => $transaction->currency,
                     'description' => "Abonnement {$plan->name}",
                     'metadata'    => [
                         'transaction_id'       => $transaction->transaction_id,
