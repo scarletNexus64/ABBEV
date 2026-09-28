@@ -86,6 +86,39 @@ return [
         'not_enough_seats'  => 'Not enough seats left in this category.',
         'cancelled_cannot_confirm' => 'This reservation was cancelled and cannot be confirmed.',
         'not_enough_to_confirm' => 'Not enough seats left to confirm this reservation.',
+        'already_used' => 'This ticket has already been scanned at the entrance and can no longer be cancelled.',
+    ],
+
+    // ---- Lions Head Awards ------------------------------------------------
+    'awards' => [
+        'no_edition'     => 'No Lions Head Awards edition is currently running.',
+        'voting_closed'  => 'Voting is not open for this category.',
+        'voted'          => 'Your vote has been recorded.',
+        'vote_changed'   => 'Your vote has been updated.',
+    ],
+
+    // ---- Talent & casting -------------------------------------------------
+    'casting' => [
+        'closed'          => 'This casting call is no longer accepting applications.',
+        'already_applied' => 'You have already applied for this role.',
+        'applied'         => 'Application sent. The production will contact you if your profile is selected.',
+    ],
+
+    // ---- Film courses -----------------------------------------------------
+    'courses' => [
+        'locked'     => 'This lesson is for subscribers only.',
+        'no_content' => 'This lesson is not available yet.',
+    ],
+
+    // ---- Open calls -------------------------------------------------------
+    'calls' => [
+        'closed'            => 'This call is no longer accepting entries.',
+        'already_submitted' => 'You have already submitted an entry for this call.',
+        'submitted'         => 'Entry sent. You will be informed of the outcome.',
+        'funding_only'      => 'This call does not accept pledges.',
+        'no_funding'        => 'A funding call is supported with a pledge, not an entry.',
+        'pledge_min'        => 'The minimum pledge is :amount.',
+        'pledged'           => 'Thank you! Your pledge has been recorded: the ABBEV team will contact you to finalise it.',
     ],
 
     // ---- Administration (panel) -----------------------------------------

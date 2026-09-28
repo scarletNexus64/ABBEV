@@ -24,7 +24,7 @@ class RubriqueSeeder extends Seeder
         $avantPremiere = Rubrique::updateOrCreate(
             ['slug' => 'avant-premiere'],
             [
-                'name' => 'Avant Première',
+                'name' => 'Avant-première',
                 'content_type' => 'media',
                 'description' => 'Les sorties à découvrir avant tout le monde.',
                 'is_active' => true,
@@ -43,6 +43,24 @@ class RubriqueSeeder extends Seeder
                 'sort_order' => 2,
             ]
         );
+
+        // « Sport » et « Jeux » (cat.md) : sélections de programmes, dont
+        // l'admin choisit le contenu depuis « Sélections éditoriales ».
+        foreach ([
+            'sport' => ['Sport', 'Compétitions, magazines et documentaires sportifs.', 30],
+            'jeux' => ['Jeux', 'Jeux télévisés, quiz et divertissements.', 40],
+        ] as $slug => [$name, $description, $order]) {
+            Rubrique::updateOrCreate(
+                ['slug' => $slug],
+                [
+                    'name' => $name,
+                    'content_type' => 'media',
+                    'description' => $description,
+                    'is_active' => true,
+                    'sort_order' => $order,
+                ]
+            );
+        }
 
         // Oeuvres de démonstration (PDFs générés).
         $oeuvres = [

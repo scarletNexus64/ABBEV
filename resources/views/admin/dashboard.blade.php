@@ -90,6 +90,67 @@
     @endif
 </div>
 
+{{-- Écosystème cat.md : un point d'entrée par module + ce qui attend l'équipe --}}
+@if(! empty($ecosystem))
+@php
+    $eco = $ecosystem;
+    $todo = collect([
+        ['count' => $eco['moderation'], 'label' => 'contenu(s) en attente de modération', 'icon' => 'clipboard-check', 'href' => route('moderation.index')],
+        ['count' => $eco['casting']['pending'], 'label' => 'candidature(s) casting à examiner', 'icon' => 'bullhorn', 'href' => route('castings.index')],
+        ['count' => $eco['calls']['submissions'], 'label' => 'candidature(s) aux appels à lire', 'icon' => 'feather-pointed', 'href' => route('calls.index')],
+        ['count' => $eco['calls']['pledges'], 'label' => 'promesse(s) de soutien à confirmer', 'icon' => 'hand-holding-dollar', 'href' => route('calls.index', ['type' => 'financement'])],
+    ])->filter(fn ($t) => $t['count'] > 0);
+    $award = $eco['awards'];
+@endphp
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+    <div class="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {{-- Lions Head Awards --}}
+        <a href="{{ $award ? route('awards.show', $award['edition']) : route('awards.index') }}" class="group relative overflow-hidden rounded-xl border border-yellow-500/25 bg-gradient-to-br from-yellow-500/15 via-dark-100 to-dark-100 p-5 hover:border-yellow-400/50 transition md:col-span-2">
+            <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded-xl bg-yellow-500/20 border border-yellow-500/40 flex items-center justify-center shrink-0"><i class="fas fa-trophy text-yellow-300 text-lg"></i></div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs uppercase tracking-wider text-yellow-300/80 font-semibold">Lions Head Awards</p>
+                    @if($award)
+                        <p class="text-white text-lg font-bold">{{ $award['edition']->name }} · {{ $award['edition']->statusLabel() }}</p>
+                        <p class="text-sm text-gray-400">
+                            {{ number_format($award['votes'], 0, ',', ' ') }} vote(s) de {{ number_format($award['voters'], 0, ',', ' ') }} votant(s)
+                            @if($award['today']) · <span class="text-emerald-300">+{{ $award['today'] }} aujourd'hui</span> @endif
+                            @if($award['edition']->isVotingOpen() && $award['edition']->voting_ends_at) · clôture {{ $award['edition']->voting_ends_at->diffForHumans() }} @endif
+                        </p>
+                    @else
+                        <p class="text-white text-lg font-bold">Aucune édition en cours</p>
+                        <p class="text-sm text-gray-400">Créez l'édition de l'année : les 29 prix officiels sont générés pour vous.</p>
+                    @endif
+                </div>
+                <i class="fas fa-chevron-right text-gray-600 group-hover:text-yellow-300 mt-2"></i>
+            </div>
+        </a>
+        <x-admin.stat label="Casting" :value="$eco['casting']['open'] . ' annonce(s) ouverte(s)'" icon="bullhorn" tone="violet"
+            :hint="$eco['casting']['week'] . ' candidature(s) cette semaine'" :href="route('castings.index')" />
+        <x-admin.stat label="Talents" :value="($eco['talents']['actors'] + $eco['talents']['technicians']) . ' fiche(s)'" icon="id-badge" tone="sky"
+            :hint="$eco['talents']['actors'] . ' comédien(s) · ' . $eco['talents']['technicians'] . ' technicien(s) · ' . $eco['talents']['agents'] . ' agent(s)'" :href="route('talents.index')" />
+        <x-admin.stat label="Appels à projets" :value="$eco['calls']['open'] . ' appel(s) ouvert(s)'" icon="lightbulb" tone="emerald"
+            :hint="\App\Support\Money::format($eco['calls']['confirmed'], 'XAF') . ' de soutiens confirmés'" :href="route('calls.index')" />
+        <x-admin.stat label="Cours de cinéma" :value="$eco['courses']['published'] . ' cours publié(s)'" icon="graduation-cap" tone="primary"
+            :hint="$eco['courses']['lessons'] . ' leçon(s) au total'" :href="route('courses.index')" />
+        <x-admin.stat label="Billetterie" :value="$eco['tickets']['seances'] . ' séance(s) · ' . $eco['tickets']['codes'] . ' code(s)'" icon="ticket" tone="amber"
+            :hint="$eco['tickets']['sold'] . ' place(s) vendue(s) ce mois-ci'" :href="route('screenings.index')" class="md:col-span-2" />
+    </div>
+
+    <x-admin.card title="À traiter" icon="list-check" padding="p-0">
+        @forelse($todo as $item)
+            <a href="{{ $item['href'] }}" class="flex items-center gap-4 px-6 py-4 border-b border-dark-200 last:border-0 hover:bg-dark-50/40 transition">
+                <span class="w-10 h-10 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center"><i class="fas fa-{{ $item['icon'] }} text-amber-300"></i></span>
+                <span class="flex-1 text-sm text-gray-300"><strong class="text-white text-lg mr-1">{{ $item['count'] }}</strong> {{ $item['label'] }}</span>
+                <i class="fas fa-chevron-right text-gray-600 text-xs"></i>
+            </a>
+        @empty
+            <x-admin.empty icon="circle-check" title="Rien en attente" text="Modération, candidatures et promesses de soutien sont à jour." />
+        @endforelse
+    </x-admin.card>
+</div>
+@endif
+
 {{-- Gains producteur : vues générées + montant estimé (tarifs configurés par l'admin) --}}
 @if($isProducer && $earnings)
 <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-6 mb-8">

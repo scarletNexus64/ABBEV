@@ -1,11 +1,29 @@
-{{-- Champs partagés création / édition d'une séance.
-     Attend : $screening (nullable), $movies, $countries --}}
+{{-- Champs partagés création / édition d'une offre de billetterie : séance
+     en salle ou code cinéma. Attend : $screening (nullable), $movies,
+     $countries, $kind (création) --}}
 @php($s = $screening ?? null)
+@php($offerKind = old('kind', $s->kind ?? ($kind ?? 'seance')))
 @php($existingTypes = old('ticket_types', $s ? $s->ticketTypes->map(fn($t) => [
         'id' => $t->id, 'name' => $t->name, 'price' => $t->price, 'capacity' => $t->capacity, 'sold' => $t->sold_seats,
     ])->values()->all() : [['id' => null, 'name' => 'Standard', 'price' => 3000, 'capacity' => 100, 'sold' => 0]]))
 @php($countriesJson = $countries->map(fn($c) => ['code' => $c->code, 'name' => $c->name, 'flag' => $c->flag_emoji, 'currency' => $c->currency_code])->values())
 
+<div x-data="{ kind: @js($offerKind) }">
+<div class="mb-6">
+    <span class="block text-sm font-medium text-gray-300 mb-2">Type d'offre</span>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl">
+        <label class="flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition" :class="kind === 'seance' ? 'border-primary-500 bg-primary-500/10' : 'border-dark-200 hover:border-dark-300'">
+            <input type="radio" name="kind" value="seance" x-model="kind" class="sr-only">
+            <i class="fas fa-film text-primary-300 mt-0.5"></i>
+            <span><span class="block text-sm text-white font-medium">Séance en salle</span><span class="block text-xs text-gray-500">Une projection datée : le client réserve ses places.</span></span>
+        </label>
+        <label class="flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition" :class="kind === 'code' ? 'border-primary-500 bg-primary-500/10' : 'border-dark-200 hover:border-dark-300'">
+            <input type="radio" name="kind" value="code" x-model="kind" class="sr-only">
+            <i class="fas fa-ticket text-primary-300 mt-0.5"></i>
+            <span><span class="block text-sm text-white font-medium">Code cinéma</span><span class="block text-xs text-gray-500">Un billet prépayé sans séance fixe, valable jusqu'à une date.</span></span>
+        </label>
+    </div>
+</div>
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Left -->
     <div>
@@ -28,7 +46,8 @@
 
         <!-- Titre libre -->
         <div class="mb-6">
-            <label for="movie_title" class="block text-sm font-medium text-gray-300 mb-2">Titre du film (si hors catalogue)</label>
+            <label for="movie_title" class="block text-sm font-medium text-gray-300 mb-2"
+                   x-text="kind === 'code' ? 'Nom de l\'offre' : 'Titre du film (si hors catalogue)'">Titre du film (si hors catalogue)</label>
             <input type="text" name="movie_title" id="movie_title"
                    value="{{ old('movie_title', $s->movie_title ?? '') }}"
                    placeholder="Ex: Avatar 3"
@@ -87,10 +106,25 @@
 
     <!-- Right -->
     <div>
+        <!-- Validité d'un code cinéma -->
+        <div class="mb-6" x-show="kind === 'code'" x-cloak>
+            <label for="valid_until" class="block text-sm font-medium text-gray-300 mb-2">Valable jusqu'au <span class="text-red-400">*</span></label>
+            <input type="datetime-local" name="valid_until" id="valid_until" :required="kind === 'code'"
+                   value="{{ old('valid_until', isset($s->valid_until) ? $s->valid_until->format('Y-m-d\TH:i') : now()->addMonths(3)->endOfDay()->format('Y-m-d\TH:i')) }}"
+                   class="w-full bg-dark-50 border @error('valid_until') border-red-500 @else border-dark-200 @enderror rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition">
+            <p class="mt-2 text-sm text-gray-400"><i class="fas fa-info-circle mr-1"></i> Le client présente son code en caisse avant cette date ; il est validé au « Contrôle des billets ».</p>
+            @error('valid_until')
+            <p class="mt-2 text-sm text-red-400"><i class="fas fa-exclamation-circle mr-1"></i> {{ $message }}</p>
+            @enderror
+        </div>
+
         <!-- Date / heure de la séance -->
         <div class="mb-6">
-            <label for="starts_at" class="block text-sm font-medium text-gray-300 mb-2">Date &amp; heure de la séance <span class="text-red-400">*</span></label>
-            <input type="datetime-local" name="starts_at" id="starts_at" required
+            <label for="starts_at" class="block text-sm font-medium text-gray-300 mb-2">
+                <span x-text="kind === 'code' ? 'Début de la vente (facultatif)' : 'Date & heure de la séance'">Date &amp; heure de la séance</span>
+                <span class="text-red-400" x-show="kind !== 'code'">*</span>
+            </label>
+            <input type="datetime-local" name="starts_at" id="starts_at" :required="kind !== 'code'"
                    value="{{ old('starts_at', isset($s->starts_at) ? $s->starts_at->format('Y-m-d\TH:i') : '') }}"
                    class="w-full bg-dark-50 border @error('starts_at') border-red-500 @else border-dark-200 @enderror rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition">
             @error('starts_at')
@@ -111,6 +145,8 @@
             <p class="mt-2 text-sm text-gray-400"><i class="fas fa-info-circle mr-1"></i> Seules les séances « Publiées » apparaissent dans l'application.</p>
         </div>
     </div>
+</div>
+
 </div>
 
 <!-- Catégories de places -->
@@ -173,6 +209,9 @@
     </p>
 </div>
 
+{{-- Poussé dans la pile « scripts » : un <script> laissé dans le contenu
+     n'est pas exécuté quand la page arrive par navigation PJAX. --}}
+@push('scripts')
 <script>
 function ticketTypes() {
     return {
@@ -208,3 +247,4 @@ function countryPicker() {
     };
 }
 </script>
+@endpush

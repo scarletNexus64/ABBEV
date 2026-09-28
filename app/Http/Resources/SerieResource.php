@@ -56,6 +56,8 @@ class SerieResource extends JsonResource
             'status' => 'En cours',
             'requiresSubscription' => true,
             'isFeatured' => (bool) $this->is_featured,
+            // Format de durée (court, moyen, long ; très court pour une série).
+            'format' => $this->format,
             'publishedAt' => optional($this->published_at)?->toIso8601String(),
             'seasons' => $this->whenLoaded('seasonsRelation', fn () => SeasonResource::collection($this->seasonsRelation)),
         ];

@@ -37,6 +37,24 @@ class Episode extends Model
     ];
 
     /**
+     * Le format d'une série (très court, court, moyen) dépend de la durée
+     * moyenne de ses épisodes : il est recalculé à chaque ajout, modification
+     * ou suppression d'épisode — sauf s'il a été fixé à la main.
+     */
+    protected static function booted(): void
+    {
+        $refresh = function (Episode $episode) {
+            $series = $episode->season?->media;
+            if ($series) {
+                \App\Support\MediaFormat::refresh($series);
+            }
+        };
+
+        static::saved($refresh);
+        static::deleted($refresh);
+    }
+
+    /**
      * Un épisode appartient à une saison.
      */
     public function season(): BelongsTo

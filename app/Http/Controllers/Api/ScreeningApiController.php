@@ -3,26 +3,33 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Concerns\ResolvesMediaUrls;
 use App\Models\Currency;
 use App\Models\Reservation;
 use App\Models\Screening;
 use App\Models\TicketType;
 use App\Services\ReservationService;
+use App\Support\BusinessTime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use RuntimeException;
 
 class ScreeningApiController extends Controller
 {
+    use ResolvesMediaUrls;
+
     public function __construct(private ReservationService $reservations)
     {
     }
 
     /**
-     * Séances réservables à venir, paginées (10/page), avec recherche et
+     * Offres de billetterie en vente, paginées (10/page), avec recherche et
      * filtre par période.
      *
      * Query params :
+     *   - kind      : 'seance' (défaut) — séances datées en salle,
+     *                 'code' — codes cinéma prépayés, sans séance fixe
      *   - page      : int (défaut 1)
      *   - q         : recherche sur le titre du film / cinéma / lieu
      *   - from      : date ISO — séances à partir de cette date
@@ -31,14 +38,20 @@ class ScreeningApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Screening::with('ticketTypes')
-            ->where('status', 'published')
-            ->where('starts_at', '>=', now());
+        $kind = $request->query('kind') === 'code' ? 'code' : 'seance';
 
-        // Filtrer par pays du user connecté : n'afficher que les séances de son pays.
-        $user = $request->user();
+        $query = Screening::with(['ticketTypes', 'media'])
+            ->onSale()
+            ->where('kind', $kind);
+
+        // Filtrer par pays du user connecté : n'afficher que les offres de son
+        // pays. Route publique : le guard sanctum est interrogé explicitement,
+        // `$request->user()` resterait null même avec un token valide.
+        // Une offre sans pays n'est réservée à personne : elle reste visible.
+        $user = $request->user('sanctum');
         if ($user && $user->country_code) {
-            $query->where('country_code', $user->country_code);
+            $query->where(fn ($q) => $q->whereNull('country_code')
+                ->orWhere('country_code', $user->country_code));
         }
 
         // Recherche plein-texte simple (film / cinéma / lieu).
@@ -50,16 +63,25 @@ class ScreeningApiController extends Controller
             });
         }
 
-        // Filtre par période.
-        [$from, $to] = $this->resolvePeriod($request);
-        if ($from) {
-            $query->where('starts_at', '>=', $from);
-        }
-        if ($to) {
-            $query->where('starts_at', '<=', $to);
+        if ($kind === 'seance') {
+            // Filtre par période : n'a de sens que pour une séance datée.
+            [$from, $to] = $this->resolvePeriod($request);
+            if ($from) {
+                $query->where('starts_at', '>=', $from);
+            }
+            if ($to) {
+                $query->where('starts_at', '<=', $to);
+            }
+            $query->orderBy('starts_at');
+        } else {
+            // Codes : ceux qui expirent le plus tôt d'abord, les codes sans
+            // date d'expiration en dernier.
+            $query->orderByRaw('CASE WHEN valid_until IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('valid_until')
+                ->orderBy('cinema_name');
         }
 
-        $paginator = $query->orderBy('starts_at')->paginate(10);
+        $paginator = $query->paginate(10);
 
         return response()->json([
             'data' => collect($paginator->items())
@@ -86,17 +108,24 @@ class ScreeningApiController extends Controller
         $from = $request->query('from');
         $to   = $request->query('to');
 
+        // Les jours s'entendent en heure locale (« aujourd'hui » à Douala),
+        // les bornes repassent en UTC pour la comparaison en base.
+        $zone = BusinessTime::zone();
+        $utc = fn (?Carbon $d) => $d?->utc();
+
         if ($from || $to) {
             return [
-                $from ? \Illuminate\Support\Carbon::parse($from)->startOfDay() : null,
-                $to ? \Illuminate\Support\Carbon::parse($to)->endOfDay() : null,
+                $utc($from ? Carbon::parse($from, $zone)->startOfDay() : null),
+                $utc($to ? Carbon::parse($to, $zone)->endOfDay() : null),
             ];
         }
 
+        $now = BusinessTime::now();
+
         return match ($request->query('period')) {
-            'today' => [now()->startOfDay(), now()->endOfDay()],
-            'week'  => [now()->startOfDay(), now()->endOfWeek()],
-            'month' => [now()->startOfDay(), now()->endOfMonth()],
+            'today' => [$utc($now->copy()->startOfDay()), $utc($now->copy()->endOfDay())],
+            'week'  => [$utc($now->copy()->startOfDay()), $utc($now->copy()->endOfWeek())],
+            'month' => [$utc($now->copy()->startOfDay()), $utc($now->copy()->endOfMonth())],
             default => [null, null],
         };
     }
@@ -106,7 +135,7 @@ class ScreeningApiController extends Controller
      */
     public function show(Screening $screening): JsonResponse
     {
-        $screening->load('ticketTypes');
+        $screening->load(['ticketTypes', 'media']);
 
         return response()->json(['data' => $this->presentScreening($screening)]);
     }
@@ -189,6 +218,12 @@ class ScreeningApiController extends Controller
             return response()->json(['message' => __('messages.reservation.not_found')], 404);
         }
 
+        // Une entrée déjà validée au contrôle ne se « rend » pas : annuler
+        // libérerait une place réellement consommée.
+        if ((int) $reservation->redeemed_quantity > 0) {
+            return response()->json(['message' => __('messages.reservation.already_used')], 422);
+        }
+
         $reservation = $this->reservations->cancel($reservation);
 
         return response()->json([
@@ -202,16 +237,23 @@ class ScreeningApiController extends Controller
      */
     private function presentScreening(Screening $s): array
     {
+        $poster = $s->relationLoaded('media') && $s->media
+            ? ($s->media->cover_path ?: $s->media->thumbnail_path)
+            : null;
+
         return [
             'id'           => $s->id,
+            'kind'         => $s->kind ?? 'seance',
             'movie_title'  => $s->movie_title,
             'cinema_name'  => $s->cinema_name,
             'location'     => $s->location,
             'country_code' => $s->country_code,
             'starts_at'    => $s->starts_at->toIso8601String(),
+            'valid_until'  => $s->valid_until?->toIso8601String(),
+            'poster_url'   => $poster ? $this->absoluteUrl($poster) : null,
             'ticket_types' => $s->ticketTypes->map(fn (TicketType $t) => [
                 'id'              => $t->id,
-                'name'            => $t->name,
+                'name'            => $t->t('name'),
                 'price'           => (float) $t->price,
                 'currency'        => $t->currency,
                 ...$this->currencyMeta($t->currency),
@@ -237,16 +279,20 @@ class ScreeningApiController extends Controller
             'currency'     => $r->currency,
             ...$this->currencyMeta($r->currency),
             'confirmed_at' => $r->confirmed_at?->toIso8601String(),
+            // Entrées déjà validées au contrôle (billet ou code cinéma).
+            'redeemed_quantity' => (int) ($r->redeemed_quantity ?? 0),
             'screening'    => $r->relationLoaded('screening') && $r->screening ? [
                 'id'          => $r->screening->id,
+                'kind'        => $r->screening->kind ?? 'seance',
                 'movie_title' => $r->screening->movie_title,
                 'cinema_name' => $r->screening->cinema_name,
                 'location'    => $r->screening->location,
                 'starts_at'   => $r->screening->starts_at->toIso8601String(),
+                'valid_until' => $r->screening->valid_until?->toIso8601String(),
             ] : null,
             'ticket_type'  => $r->relationLoaded('ticketType') && $r->ticketType ? [
                 'id'   => $r->ticketType->id,
-                'name' => $r->ticketType->name,
+                'name' => $r->ticketType->t('name'),
             ] : null,
         ];
     }

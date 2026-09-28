@@ -13,6 +13,10 @@ class CategoryResource extends JsonResource
             'id' => (string) $this->id,
             'name' => $this->t('name'),
             'slug' => $this->slug ?? null,
+            // Famille d'appartenance (genre, cours, award…) : c'est elle qui
+            // pilote le regroupement en sections côté app.
+            'family' => $this->family ?? 'genre',
+            'sortOrder' => (int) ($this->sort_order ?? 0),
             'description' => $this->t('description') ?? '',
             'mediaCount' => (int) ($this->media_count ?? 0),
         ];

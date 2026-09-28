@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Media;
+use App\Support\MediaFormat;
 use App\Services\BunnyStreamService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -37,7 +38,9 @@ class MediaController extends Controller
 
     public function create(Request $request)
     {
-        $categories = Category::orderBy('name')->get();
+        // Genres seulement (cat.md) : formats et sélections ont leurs champs.
+        $categories = Category::genres()->get();
+        $rubriques = $this->editorialRubriques();
         // Si on vient de la library Bunny ("Créer un film à partir de cette vidéo")
         $preselectedBunnyGuid = $request->query('bunny');
 
@@ -47,7 +50,7 @@ class MediaController extends Controller
             ? $request->query('type')
             : null;
 
-        return view('media.create', compact('categories', 'preselectedBunnyGuid', 'forcedType'));
+        return view('media.create', compact('categories', 'preselectedBunnyGuid', 'forcedType', 'rubriques'));
     }
 
     public function store(Request $request)
@@ -72,6 +75,11 @@ class MediaController extends Controller
             'is_featured'  => 'nullable|boolean',
             'published_at' => 'nullable|date',
             'tier'         => 'nullable|in:classique,standard,premium',
+            // Format de durée : vide = déduit de la durée (cf. MediaFormat).
+            'format'       => 'nullable|in:' . implode(',', array_unique([...MediaFormat::MOVIE, ...MediaFormat::SERIES])),
+            // Sélections éditoriales (Avant-première, Sport, Jeux) — admin.
+            'rubriques'    => 'nullable|array',
+            'rubriques.*'  => 'integer|exists:rubriques,id',
         ]);
 
         // Pour un film, on EXIGE un video_id Bunny (sinon il n'y a rien à lire)
@@ -104,7 +112,8 @@ class MediaController extends Controller
             }
         }
 
-        Media::create($data);
+        $media = Media::create($data);
+        $this->classify($request, $media);
 
         return redirect()->route('media.index')
             ->with('success', 'Média créé avec succès.');
@@ -125,13 +134,15 @@ class MediaController extends Controller
     public function edit(Media $medium)
     {
         $this->authorizeOwnership($medium);
-        $categories = Category::orderBy('name')->get();
+        $categories = Category::genres()->get();
+        $rubriques = $this->editorialRubriques();
+        $medium->load('rubriques');
 
         $seasons = $medium->isSeries()
             ? $medium->seasonsRelation()->with(['episodes' => fn ($q) => $q->orderBy('episode_number')])->get()
             : collect();
 
-        return view('media.edit', compact('medium', 'categories', 'seasons'));
+        return view('media.edit', compact('medium', 'categories', 'seasons', 'rubriques'));
     }
 
     public function update(Request $request, Media $medium)
@@ -153,6 +164,11 @@ class MediaController extends Controller
             'is_featured'  => 'nullable|boolean',
             'published_at' => 'nullable|date',
             'tier'         => 'nullable|in:classique,standard,premium',
+            // Format de durée : vide = déduit de la durée (cf. MediaFormat).
+            'format'       => 'nullable|in:' . implode(',', array_unique([...MediaFormat::MOVIE, ...MediaFormat::SERIES])),
+            // Sélections éditoriales (Avant-première, Sport, Jeux) — admin.
+            'rubriques'    => 'nullable|array',
+            'rubriques.*'  => 'integer|exists:rubriques,id',
         ]);
 
         if ($validated['type'] === 'movie' && empty($validated['bunny_video_id'])) {
@@ -183,6 +199,7 @@ class MediaController extends Controller
         }
 
         $medium->update($data);
+        $this->classify($request, $medium);
 
         return redirect()->route('media.index')
             ->with('success', 'Média mis à jour avec succès.');
@@ -292,9 +309,51 @@ class MediaController extends Controller
             $data['video_library_id'] = null;
         }
 
-        unset($data['bunny_video_id']);
+        // Format et sélections sont appliqués par `classify()` une fois le
+        // contenu enregistré (le format d'une série dépend de ses épisodes).
+        unset($data['bunny_video_id'], $data['format'], $data['rubriques']);
 
         return $data;
+    }
+
+    /**
+     * Format de durée et sélections éditoriales.
+     *
+     * Format choisi → figé (`format_locked`) ; « Automatique » → déduit de la
+     * durée, et recalculé à chaque changement. Les sélections ne sont
+     * modifiables que par un admin : c'est un choix éditorial, pas une
+     * donnée du producteur.
+     */
+    protected function classify(Request $request, Media $media): void
+    {
+        $format = $request->input('format');
+
+        if (MediaFormat::isValid($media->type, $format)) {
+            $media->forceFill(['format' => $format, 'format_locked' => true])->saveQuietly();
+        } else {
+            $media->forceFill(['format_locked' => false])->saveQuietly();
+            MediaFormat::refresh($media);
+        }
+
+        if (auth()->user()?->isAdmin() && $request->boolean('rubriques_present')) {
+            $ids = collect($request->input('rubriques', []))->map(fn ($id) => (int) $id)->all();
+            $editorial = $this->editorialRubriques()->pluck('id')->all();
+            $current = $media->rubriques()->pluck('rubriques.id')->all();
+
+            foreach (array_diff($editorial, $ids) as $removed) {
+                $media->rubriques()->detach($removed);
+            }
+            foreach (array_diff(array_intersect($ids, $editorial), $current) as $added) {
+                $next = (int) \Illuminate\Support\Facades\DB::table('media_rubrique')->where('rubrique_id', $added)->max('sort_order') + 1;
+                $media->rubriques()->attach($added, ['sort_order' => $next]);
+            }
+        }
+    }
+
+    /** Rubriques de type « média » : Avant-première, Sport, Jeux… */
+    protected function editorialRubriques()
+    {
+        return \App\Models\Rubrique::where('content_type', 'media')->orderBy('sort_order')->get();
     }
 
     /**

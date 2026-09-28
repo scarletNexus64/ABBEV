@@ -26,73 +26,32 @@ use Illuminate\Database\Seeder;
 class TranslationSeeder extends Seeder
 {
     /**
-     * Catégories / genres : nom FR exact en base → nom EN.
-     * La clé DOIT correspondre au `name` stocké, sinon la ligne est ignorée
-     * (et signalée dans le récapitulatif de fin).
+     * Catégories : **slug** → [nom EN, description EN].
+     *
+     * Indexé sur le slug et non sur le libellé français : le slug est la clé
+     * stable du catalogue (cf. `CategorySeeder`), alors qu'un libellé se
+     * reformule au fil des retours client — et chaque reformulation faisait
+     * silencieusement retomber la ligne en français.
      */
     private const CATEGORIES = [
-        'Acteur/Actrice'         => 'Actor/Actress',
-        'Action'                 => 'Action',
-        'Animation'              => 'Animation',
-        'Anime'                  => 'Anime',
-        'Aventure'               => 'Adventure',
-        'Biographie'             => 'Biography',
-        'Comédie'                => 'Comedy',
-        'Cours de Cinéma'        => 'Film Courses',
-        'Court-métrage'          => 'Short Film',
-        'Crime'                  => 'Crime',
-        'Documentaire'           => 'Documentary',
-        'Drame'                  => 'Drama',
-        'Famille'                => 'Family',
-        'Fantastique'            => 'Fantasy',
-        'Film Documentaire'      => 'Documentary Film',
-        "Film d'Animation"       => 'Animated Film',
-        'Films'                  => 'Movies',
-        'Financement de Projets' => 'Project Funding',
-        'Guerre'                 => 'War',
-        'Historique'             => 'Historical',
-        'Horreur'                => 'Horror',
-        'Lions Head Awards'      => 'Lions Head Awards',
-        'Long-métrage'           => 'Feature Film',
-        'Meilleur Acteur'        => 'Best Actor',
-        'Meilleur Film'          => 'Best Film',
-        'Meilleur Réalisateur'   => 'Best Director',
-        'Meilleur Scénario'      => 'Best Screenplay',
-        'Meilleure Actrice'      => 'Best Actress',
-        'Meilleure Série'        => 'Best Series',
-        'Montage'                => 'Editing',
-        'Musical'                => 'Musical',
-        'Mystère'                => 'Mystery',
-        'Photographie'           => 'Cinematography',
-        'Production'             => 'Production',
-        'Romance'                => 'Romance',
-        'Réalisation'            => 'Directing',
-        'Réservation Cinéma'     => 'Cinema Booking',
-        "Révélation de l'année"  => 'Breakthrough of the Year',
-        'Science-Fiction'        => 'Science Fiction',
-        'Scénarisation'          => 'Screenwriting',
-        'Son & Musique'          => 'Sound & Music',
-        'Sport'                  => 'Sports',
-        'Séries'                 => 'Series',
-        'Thriller'               => 'Thriller',
-        'Web-série'              => 'Web Series',
-        'Western'                => 'Western',
-    ];
-
-    /** Descriptions de catégories rencontrées en base. */
-    private const CATEGORY_DESCRIPTIONS = [
-        "Films et séries d'action palpitants" => 'Thrilling action movies and series',
-        'Pour rire et se détendre'            => 'To laugh and unwind',
-        'Histoires émouvantes et profondes'   => 'Moving, profound stories',
-        'Frissons et suspense garantis'       => 'Chills and suspense guaranteed',
-        'Découvrez le monde réel'             => 'Discover the real world',
-        "Histoires d'amour touchantes"        => 'Touching love stories',
-        "Voyages vers l'avenir"               => 'Journeys into the future',
-        'Suspense et mystère'                 => 'Suspense and mystery',
-        'Pour toute la famille'               => 'For the whole family',
-        'Divertissement familial'             => 'Family entertainment',
-        'Mondes magiques et fantastiques'     => 'Magical, fantastic worlds',
-        'Récits de guerre historiques'        => 'Historical war stories',
+        // Les 15 genres de cat.md — seules entrées de la table `categories`
+        // depuis que formats, casting, cours, appels, awards et billetterie
+        // ont leur propre module.
+        'drame' => ['Drama', 'Dramatic, emotionally charged stories'],
+        'romance' => ['Romance', 'Love stories and romantic relationships'],
+        'aventure' => ['Adventure', 'Exploration, quests and epic journeys'],
+        'comedie' => ['Comedy', 'Comedies and humorous series to make you laugh'],
+        'famille' => ['Family', 'Content suitable for the whole family'],
+        'fantastique' => ['Fantasy', 'Magical worlds, fantastic creatures and mythology'],
+        'documentaire' => ['Documentary', 'Documentary films and series on real subjects'],
+        'docu-fiction' => ['Docudrama', 'True stories reconstructed with the means of fiction'],
+        'policier' => ['Crime', 'Investigations, suspense and crime stories'],
+        'historique' => ['Historical', 'Reconstructions of historical events'],
+        'mystere' => ['Mystery', 'Riddles and mysterious investigations'],
+        'science-fiction' => ['Science Fiction', 'Futuristic worlds, advanced technology and imagined universes'],
+        'western' => ['Western', 'Wide open spaces, cowboys and duels'],
+        'animation' => ['Animation', 'Animated films and series for all ages'],
+        'horreur' => ['Horror', 'Horror and terror films and series'],
     ];
 
     /** Plans d'abonnement : nom FR → [nom EN, description EN]. */
@@ -108,6 +67,14 @@ class TranslationSeeder extends Seeder
         'ABBEV' => [
             'name'        => 'ABBEV',
             'description' => 'Full access to the entire ABBEV catalogue',
+        ],
+        'Classique' => [
+            'name'        => 'Classic',
+            'description' => 'The essentials of the ABBEV catalogue',
+        ],
+        'Standard' => [
+            'name'        => 'Standard',
+            'description' => 'The extended catalogue, series included',
         ],
     ];
 
@@ -132,10 +99,22 @@ class TranslationSeeder extends Seeder
         'Support prioritaire 24/7'              => '24/7 priority support',
         'Invitations événements ABBEV'          => 'Invitations to ABBEV events',
         'Nouveautés et exclusivités'            => 'New releases and exclusives',
+        'Accès au catalogue Classique'          => 'Access to the Classic catalogue',
+        'Accès aux catalogues Classique et Standard' => 'Access to the Classic and Standard catalogues',
+        'Accès à tout le catalogue ABBEV'       => 'Access to the entire ABBEV catalogue',
+        'Exclusivités et avant-premières'       => 'Exclusives and premieres',
+        'Visionnage en HD'                      => 'HD streaming',
+        'Visionnage en Full HD'                 => 'Full HD streaming',
+        'Téléchargement hors-ligne'             => 'Offline downloads',
     ];
 
     /** Rubriques : nom FR → [nom EN, description EN]. */
     private const RUBRIQUES = [
+        'Avant-première' => [
+            'name'        => 'Premieres',
+            'description' => 'Releases to discover before everyone else.',
+        ],
+        // Ancienne graphie, encore présente dans les bases existantes.
         'Avant Première' => [
             'name'        => 'Premieres',
             'description' => 'Releases to discover before everyone else.',
@@ -143,6 +122,14 @@ class TranslationSeeder extends Seeder
         'Œuvre adaptable' => [
             'name'        => 'Adaptable Works',
             'description' => 'Literary works awaiting adaptation.',
+        ],
+        'Sport' => [
+            'name'        => 'Sports',
+            'description' => 'Competitions, sports shows and documentaries.',
+        ],
+        'Jeux' => [
+            'name'        => 'Games',
+            'description' => 'Game shows, quizzes and entertainment.',
         ],
     ];
 
@@ -181,19 +168,21 @@ class TranslationSeeder extends Seeder
         $missed = [];
 
         foreach (Category::all() as $category) {
-            $hasName = isset(self::CATEGORIES[$category->name]);
+            $entry = self::CATEGORIES[$category->slug] ?? null;
 
-            if ($hasName) {
-                $category->setTranslation('name', 'en', self::CATEGORIES[$category->name]);
-                $done++;
-            } else {
-                $missed[] = $category->name;
+            if ($entry === null) {
+                // Signalé par le slug : c'est lui qu'il faudra ajouter à la
+                // table ci-dessus, pas le libellé.
+                $missed[] = $category->slug;
+                continue;
             }
 
-            $description = (string) $category->description;
-            if ($description !== '' && isset(self::CATEGORY_DESCRIPTIONS[$description])) {
-                $category->setTranslation('description', 'en', self::CATEGORY_DESCRIPTIONS[$description]);
+            [$name, $description] = $entry;
+            $category->setTranslation('name', 'en', $name);
+            if ($description !== '') {
+                $category->setTranslation('description', 'en', $description);
             }
+            $done++;
         }
 
         return [$done, $missed];

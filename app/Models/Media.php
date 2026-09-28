@@ -6,6 +6,7 @@ use App\Concerns\HasObfuscatedRouteKey;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Concerns\HasTranslations;
 
@@ -34,6 +35,8 @@ class Media extends Model
         'slug',
         'description',
         'duration',
+        'format',
+        'format_locked',
         'release_year',
         'seasons',
         'video_path',
@@ -54,6 +57,7 @@ class Media extends Model
         'published_at'   => 'datetime',
         'reviewed_at'    => 'datetime',
         'is_featured'    => 'boolean',
+        'format_locked'  => 'boolean',
         'video_metadata' => 'array',
         'producer_views' => 'integer',
     ];
@@ -61,6 +65,20 @@ class Media extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /** Sélections éditoriales (Avant-première, Sport, Jeux…) du contenu. */
+    public function rubriques(): BelongsToMany
+    {
+        return $this->belongsToMany(Rubrique::class, 'media_rubrique')
+            ->withPivot('sort_order')
+            ->withTimestamps();
+    }
+
+    /** Filtre sur un format de durée (court, moyen, long, tres-court). */
+    public function scopeOfFormat(Builder $query, ?string $format): Builder
+    {
+        return $format ? $query->where('format', $format) : $query;
     }
 
     /** Propriétaire du contenu (producteur ou admin créateur). */

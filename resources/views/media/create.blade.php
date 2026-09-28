@@ -168,9 +168,9 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-2">Catégorie <span class="text-primary-400">*</span></label>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Genre <span class="text-primary-400">*</span></label>
                     <select name="category_id" required class="w-full bg-dark-50 border border-dark-200 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20">
-                        <option value="">— Choisir une catégorie —</option>
+                        <option value="">— Choisir un genre —</option>
                         @foreach($categories as $category)
                             <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>{{ $category->name }}</option>
                         @endforeach
@@ -212,6 +212,8 @@
                 </div>
             </div>
         </div>
+
+        @include('media._classification', ['medium' => null, 'rubriques' => $rubriques])
 
         <!-- Visuels -->
         <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-6">

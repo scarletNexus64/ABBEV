@@ -60,6 +60,8 @@ class MovieResource extends JsonResource
             'popularity' => (int) ($this->views_count ?? 0),
             'requiresSubscription' => true,
             'isFeatured' => (bool) $this->is_featured,
+            // Format de durée (court, moyen, long ; très court pour une série).
+            'format' => $this->format,
             'publishedAt' => optional($this->published_at)?->toIso8601String(),
         ];
     }

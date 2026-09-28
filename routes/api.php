@@ -2,10 +2,16 @@
 
 use App\Http\Controllers\Api\AdminMediaApiController;
 use App\Http\Controllers\Api\AuthApiController;
+use App\Http\Controllers\Api\AwardApiController;
+use App\Http\Controllers\Api\CastingApiController;
 use App\Http\Controllers\Api\CategoryApiController;
+use App\Http\Controllers\Api\CourseApiController;
 use App\Http\Controllers\Api\CryptoPaymentController;
 use App\Http\Controllers\Api\EpisodeApiController;
+use App\Http\Controllers\Api\ExploreApiController;
 use App\Http\Controllers\Api\LocaleApiController;
+use App\Http\Controllers\Api\ProjectCallApiController;
+use App\Http\Controllers\Api\TalentApiController;
 use App\Http\Controllers\Api\LocalVideoStreamController;
 use App\Http\Controllers\Api\OeuvreFileController;
 use App\Http\Controllers\Api\MediaApiController;
@@ -164,6 +170,55 @@ Route::prefix('v1')->group(function () {
     Route::get('/categories/{category}/media',      [MediaApiController::class, 'categoryMedia']);
     Route::get('/search',                           [MediaApiController::class, 'search']);
     Route::get('/featured',                         [MediaApiController::class, 'featured']);
+
+    // -------------------------------------------------------------
+    // EXPLORER — sections de cat.md (sommaire, awards, talents,
+    // casting, cours, appels à projets). Consultation publique ;
+    // toute participation exige un compte.
+    // -------------------------------------------------------------
+    Route::get('/explore', ExploreApiController::class);
+
+    // Lions Head Awards
+    Route::get('/awards/current',            [AwardApiController::class, 'current']);
+    Route::get('/awards/editions/{edition}', [AwardApiController::class, 'show']);
+    Route::post('/awards/nominees/{nominee}/vote', [AwardApiController::class, 'vote'])
+        ->middleware(['auth:sanctum', 'throttle:60,1']);
+
+    // Talents & agents
+    Route::get('/talents',          [TalentApiController::class, 'index']);
+    Route::get('/talents/{talent}', [TalentApiController::class, 'show']);
+    Route::get('/agents',           [TalentApiController::class, 'agents']);
+    Route::get('/agents/{agent}',   [TalentApiController::class, 'agent']);
+
+    // Annonces de casting
+    Route::get('/casting-calls',        [CastingApiController::class, 'index']);
+    Route::get('/casting-calls/{call}', [CastingApiController::class, 'show']);
+    Route::post('/casting-roles/{role}/apply', [CastingApiController::class, 'apply'])
+        ->middleware(['auth:sanctum', 'throttle:10,1']);
+
+    // Cours de cinéma
+    Route::get('/courses',          [CourseApiController::class, 'index']);
+    Route::get('/courses/{course}', [CourseApiController::class, 'show']);
+    Route::get('/courses/{course}/lessons/{lesson}/access', [CourseApiController::class, 'access'])
+        ->middleware(['auth:sanctum', 'throttle:60,1']);
+    // PDF d'une leçon — URL signée délivrée par `access` (pas d'en-tête requis).
+    Route::get('/course-lessons/{lesson}/file', [CourseApiController::class, 'file'])
+        ->middleware('signed')
+        ->name('api.course-lessons.file');
+
+    // Appels à projets (financement, écriture, musique)
+    Route::get('/calls',        [ProjectCallApiController::class, 'index']);
+    Route::get('/calls/{call}', [ProjectCallApiController::class, 'show']);
+    Route::middleware(['auth:sanctum', 'throttle:10,1'])->group(function () {
+        Route::post('/calls/{call}/submissions', [ProjectCallApiController::class, 'submit']);
+        Route::post('/calls/{call}/pledges',     [ProjectCallApiController::class, 'pledge']);
+    });
+
+    // Mes participations (candidatures casting, appels, promesses)
+    Route::middleware('auth:sanctum')->prefix('me')->group(function () {
+        Route::get('/casting-applications', [CastingApiController::class, 'mine']);
+        Route::get('/calls',                [ProjectCallApiController::class, 'mine']);
+    });
 
     // -------------------------------------------------------------
     // PUBLIC — compat ancienne route

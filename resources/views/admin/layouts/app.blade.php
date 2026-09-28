@@ -178,6 +178,11 @@
         .cm-btn-primary { background: #06b6d4; }
         .cm-btn-primary:hover { background: #0891b2; }
 
+        /* ====== Groupes repliables de la barre latérale ====== */
+        details.abbev-nav-group > summary { list-style: none; }
+        details.abbev-nav-group > summary::-webkit-details-marker { display: none; }
+        details.abbev-nav-group:not([open]) > summary i { transform: rotate(-90deg); }
+
         /* ====== Scrollbar custom ABBEV (listes défilables) ====== */
         .abbev-scroll { scrollbar-width: thin; scrollbar-color: #0891b2 transparent; }
         .abbev-scroll::-webkit-scrollbar { width: 9px; height: 9px; }
@@ -295,152 +300,107 @@
             </div>
 
             <!-- Navigation -->
-            <nav class="flex-1 mt-6 px-3 overflow-y-auto abbev-scroll">
-                <!-- Dashboard -->
-                <div class="space-y-1">
-                    <a href="{{ route('admin.dashboard') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('admin.dashboard') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-chart-pie w-5 mr-3"></i>
-                        Dashboard
-                    </a>
-                </div>
+            @php
+                $__user = auth()->user();
+                $__isAdmin = $__user->isAdmin();
+                $__isAssistant = $__user->isAssistant();
+                // Compteurs « à traiter » : un chiffre n'apparaît que s'il
+                // demande une action de l'équipe.
+                $__pendingModeration = ($__isAdmin || $__isAssistant)
+                    ? \App\Models\Media::where('moderation_status', 'pending')->count() : 0;
+                $__pendingApplications = $__isAdmin
+                    ? \App\Models\CastingApplication::where('status', 'pending')->count() : 0;
+                $__pendingCalls = $__isAdmin
+                    ? \App\Models\ProjectSubmission::where('status', 'received')->count()
+                      + \App\Models\ProjectPledge::where('status', 'pending')->count() : 0;
+                $__votingOpen = $__isAdmin
+                    && optional(\App\Models\AwardEdition::where('is_current', true)->first())->isVotingOpen();
+            @endphp
+            <nav class="flex-1 mt-4 px-3 pb-6 overflow-y-auto abbev-scroll">
+                <x-admin.nav-link :href="route('admin.dashboard')" icon="chart-pie" :active="request()->routeIs('admin.dashboard')">
+                    Tableau de bord
+                </x-admin.nav-link>
 
-                <!-- Section Contenu -->
-                <div class="mt-8 pt-6 border-t border-dark-200">
-                    <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Contenu</p>
-
-                    @unless(auth()->user()->isAssistant())
-                    <a href="{{ route('films.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('films.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-video w-5 mr-3"></i>
-                        Films
-                    </a>
-
-                    <a href="{{ route('series.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('series.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-tv w-5 mr-3"></i>
-                        Séries
-                    </a>
-                    <a href="{{ route('oeuvres.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('oeuvres.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-book w-5 mr-3"></i>
-                        Oeuvres adaptables
-                    </a>
-
-                    @endunless
-
-                    @if(auth()->user()->isAdmin() || auth()->user()->isAssistant())
-                    @php $__pendingModeration = \App\Models\Media::where('moderation_status', 'pending')->count(); @endphp
-                    <a href="{{ route('moderation.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('moderation.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-clipboard-check w-5 mr-3"></i>
-                        Modération
-                        @if($__pendingModeration > 0)
-                            <span class="ml-auto text-xs px-2 py-0.5 rounded-full bg-amber-500 text-white">{{ $__pendingModeration }}</span>
-                        @endif
-                    </a>
+                {{-- Catalogue : films, séries et leur classement (genres, formats, sélections) --}}
+                @unless($__isAssistant)
+                <x-admin.nav-group key="catalogue" label="Catalogue"
+                    :active="request()->routeIs('films.*', 'series.*', 'media.*', 'episodes.*', 'categories.*', 'rubriques.*', 'oeuvres.*', 'admin.bunny.*')">
+                    <x-admin.nav-link :href="route('films.index')" icon="film" :active="request()->routeIs('films.*')">Films</x-admin.nav-link>
+                    <x-admin.nav-link :href="route('series.index')" icon="tv" :active="request()->routeIs('series.*')">Séries & feuilletons</x-admin.nav-link>
+                    @if($__isAdmin)
+                    <x-admin.nav-link :href="route('categories.index')" icon="masks-theater" :active="request()->routeIs('categories.*')">Genres</x-admin.nav-link>
+                    <x-admin.nav-link :href="route('rubriques.index')" icon="star" :active="request()->routeIs('rubriques.*')">Sélections éditoriales</x-admin.nav-link>
                     @endif
-
-                    @if(auth()->user()->isAdmin())
-                    <a href="{{ route('categories.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('categories.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-th-large w-5 mr-3"></i>
-                        Catégories
-                    </a>
-
-                    <a href="{{ route('screenings.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('screenings.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-ticket-alt w-5 mr-3"></i>
-                        Séances cinéma
-                    </a>
-
-                    <a href="{{ route('admin.bunny.library') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('admin.bunny.library') || request()->routeIs('admin.bunny.videos.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-cloud w-5 mr-3"></i>
-                        Bunny Library
-                    </a>
-                    @endif
-
-                    @unless(auth()->user()->isAssistant())
+                    <x-admin.nav-link :href="route('oeuvres.index')" icon="book-open" :active="request()->routeIs('oeuvres.*')">Œuvres adaptables</x-admin.nav-link>
                     @php
                         $__activeUploadsQuery = \App\Models\BunnyUpload::whereNotIn('status', \App\Models\BunnyUpload::TERMINAL);
-                        if (auth()->user()->role === 'producer') {
-                            $__activeUploadsQuery->where('user_id', auth()->id());
+                        if ($__user->role === 'producer') {
+                            $__activeUploadsQuery->where('user_id', $__user->id);
                         }
                         $__activeUploads = $__activeUploadsQuery->count();
+                        $__uploadsActive = request()->routeIs('admin.bunny.uploads.*') || request()->routeIs('admin.bunny.upload.*');
                     @endphp
+                    {{-- Lien écrit à la main : le badge doit exister même à 0,
+                         le moteur d'upload l'allume en direct par son id. --}}
                     <a href="{{ route('admin.bunny.uploads.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('admin.bunny.uploads.*') || request()->routeIs('admin.bunny.upload.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-cloud-arrow-up w-5 mr-3"></i>
-                        Upload vidéos
-                        <span id="sidebar-upload-badge" class="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold rounded-full bg-blue-500 text-white animate-pulse {{ $__activeUploads > 0 ? '' : 'hidden' }}">{{ $__activeUploads }}</span>
+                       class="group flex items-center gap-3 px-3 py-2 text-[13px] rounded-lg transition-all {{ $__uploadsActive ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md shadow-primary-900/30' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
+                        <i class="fas fa-cloud-arrow-up w-4 text-center {{ $__uploadsActive ? 'text-white' : 'text-gray-500 group-hover:text-primary-300' }}"></i>
+                        <span class="flex-1 truncate">Upload vidéos</span>
+                        <span id="sidebar-upload-badge" class="text-[10px] font-bold px-1.5 min-w-[20px] text-center py-0.5 rounded-full bg-blue-500 text-white animate-pulse {{ $__activeUploads > 0 ? '' : 'hidden' }}">{{ $__activeUploads }}</span>
                     </a>
-                    @endunless
-                </div>
+                    @if($__isAdmin)
+                    <x-admin.nav-link :href="route('admin.bunny.library')" icon="cloud" :active="request()->routeIs('admin.bunny.library') || request()->routeIs('admin.bunny.videos.*')">Bunny Library</x-admin.nav-link>
+                    @endif
+                </x-admin.nav-group>
+                @endunless
 
-                @if(auth()->user()->isAdmin())
-                <!-- Section Utilisateurs -->
-                <div class="mt-8 pt-6 border-t border-dark-200">
-                    <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Utilisateurs</p>
+                @if($__isAdmin || $__isAssistant)
+                <x-admin.nav-group key="moderation" label="Validation" :active="request()->routeIs('moderation.*')">
+                    <x-admin.nav-link :href="route('moderation.index')" icon="clipboard-check" :active="request()->routeIs('moderation.*')" :badge="$__pendingModeration ?: null">Modération</x-admin.nav-link>
+                </x-admin.nav-group>
+                @endif
 
-                    <a href="{{ route('users.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('users.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-users w-5 mr-3"></i>
-                        Utilisateurs
-                    </a>
+                @if($__isAdmin)
+                <x-admin.nav-group key="talents" label="Talents & casting" :active="request()->routeIs('talents.*', 'agents.*', 'castings.*')">
+                    <x-admin.nav-link :href="route('talents.index')" icon="id-badge" :active="request()->routeIs('talents.*')">Talents</x-admin.nav-link>
+                    <x-admin.nav-link :href="route('agents.index')" icon="user-tie" :active="request()->routeIs('agents.*')">Agents</x-admin.nav-link>
+                    <x-admin.nav-link :href="route('castings.index')" icon="bullhorn" :active="request()->routeIs('castings.*')" :badge="$__pendingApplications ?: null">Annonces casting</x-admin.nav-link>
+                </x-admin.nav-group>
 
-                    <a href="{{ route('administrators.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('administrators.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-user-shield w-5 mr-3"></i>
-                        Administrateurs
-                    </a>
+                <x-admin.nav-group key="awards" label="Lions Head Awards" :active="request()->routeIs('awards.*')">
+                    <x-admin.nav-link :href="route('awards.index')" icon="trophy" :active="request()->routeIs('awards.*')"
+                        :badge="$__votingOpen ? 'LIVE' : null" badge-class="bg-emerald-500 text-white">Éditions & votes</x-admin.nav-link>
+                </x-admin.nav-group>
 
-                    <a href="{{ route('producers.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('producers.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-clapperboard w-5 mr-3"></i>
-                        Producteurs
-                    </a>
+                <x-admin.nav-group key="formation" label="Formation" :active="request()->routeIs('courses.*')">
+                    <x-admin.nav-link :href="route('courses.index')" icon="graduation-cap" :active="request()->routeIs('courses.*')">Cours de cinéma</x-admin.nav-link>
+                </x-admin.nav-group>
 
-                    <a href="{{ route('assistants.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('assistants.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-user-shield w-5 mr-3"></i>
-                        Assistants
-                    </a>
-                </div>
+                <x-admin.nav-group key="appels" label="Appels à projets" :active="request()->routeIs('calls.*')">
+                    <x-admin.nav-link :href="route('calls.index')" icon="lightbulb" :active="request()->routeIs('calls.*')" :badge="$__pendingCalls ?: null">Financement, écriture, musique</x-admin.nav-link>
+                </x-admin.nav-group>
 
-                <!-- Section Abonnements -->
-                <div class="mt-8 pt-6 border-t border-dark-200">
-                    <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Abonnements & Paiements</p>
+                <x-admin.nav-group key="billetterie" label="Billetterie" :active="request()->routeIs('screenings.*', 'tickets.*')">
+                    <x-admin.nav-link :href="route('screenings.index')" icon="ticket" :active="request()->routeIs('screenings.*')">Séances & codes cinéma</x-admin.nav-link>
+                    <x-admin.nav-link :href="route('tickets.check')" icon="qrcode" :active="request()->routeIs('tickets.*')">Contrôle des billets</x-admin.nav-link>
+                </x-admin.nav-group>
 
-                    <a href="{{ route('subscription-plans.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('subscription-plans.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-tags w-5 mr-3"></i>
-                        Packs d'abonnement
-                    </a>
+                <x-admin.nav-group key="utilisateurs" label="Utilisateurs" :active="request()->routeIs('users.*', 'administrators.*', 'producers.*', 'assistants.*')">
+                    <x-admin.nav-link :href="route('users.index')" icon="users" :active="request()->routeIs('users.*')">Abonnés</x-admin.nav-link>
+                    <x-admin.nav-link :href="route('producers.index')" icon="clapperboard" :active="request()->routeIs('producers.*')">Producteurs</x-admin.nav-link>
+                    <x-admin.nav-link :href="route('assistants.index')" icon="user-check" :active="request()->routeIs('assistants.*')">Assistants</x-admin.nav-link>
+                    <x-admin.nav-link :href="route('administrators.index')" icon="user-shield" :active="request()->routeIs('administrators.*')">Administrateurs</x-admin.nav-link>
+                </x-admin.nav-group>
 
-                    <a href="{{ route('transactions.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('transactions.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-receipt w-5 mr-3"></i>
-                        Transactions
-                    </a>
+                <x-admin.nav-group key="paiements" label="Abonnements & paiements" :active="request()->routeIs('subscription-plans.*', 'transactions.*', 'earnings.*')">
+                    <x-admin.nav-link :href="route('subscription-plans.index')" icon="tags" :active="request()->routeIs('subscription-plans.*')">Packs d'abonnement</x-admin.nav-link>
+                    <x-admin.nav-link :href="route('transactions.index')" icon="receipt" :active="request()->routeIs('transactions.*')">Transactions</x-admin.nav-link>
+                    <x-admin.nav-link :href="route('earnings.index')" icon="coins" :active="request()->routeIs('earnings.*')">Revenus producteurs</x-admin.nav-link>
+                </x-admin.nav-group>
 
-                    <a href="{{ route('earnings.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('earnings.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-coins w-5 mr-3"></i>
-                        Revenus producteurs
-                    </a>
-                </div>
-
-                <!-- Section Paramètres -->
-                <div class="mt-8 pt-6 border-t border-dark-200">
-                    <p class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Paramètres</p>
-
-                    <a href="{{ route('configuration.index') }}"
-                       class="flex items-center px-4 py-3 text-sm rounded-lg transition-all {{ request()->routeIs('configuration.*') ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md' : 'text-gray-300 hover:bg-dark-200 hover:text-white' }}">
-                        <i class="fas fa-cog w-5 mr-3"></i>
-                        Configuration
-                    </a>
-                </div>
+                <x-admin.nav-group key="parametres" label="Paramètres" :active="request()->routeIs('configuration.*')">
+                    <x-admin.nav-link :href="route('configuration.index')" icon="gear" :active="request()->routeIs('configuration.*')">Configuration</x-admin.nav-link>
+                </x-admin.nav-group>
                 @endif
             </nav>
 
@@ -726,6 +686,34 @@
 
         UE.init();
 
+        /* ====== GROUPES DE LA BARRE LATÉRALE ======
+           Un groupe replié le reste d'une page à l'autre (mémoire locale au
+           navigateur) ; celui de la page courante est toujours ouvert. */
+        const NavGroups = ABBEV.navGroups = {
+            KEY: 'abbev.nav.collapsed',
+            read(){ try { return JSON.parse(localStorage.getItem(this.KEY) || '[]'); } catch(e){ return []; } },
+            write(list){ try { localStorage.setItem(this.KEY, JSON.stringify(list)); } catch(e){} },
+            restoring: false,
+            restore(){
+                const collapsed = this.read();
+                this.restoring = true;
+                document.querySelectorAll('details[data-nav-group]').forEach((d) => {
+                    d.open = d.dataset.active === '1' || !collapsed.includes(d.dataset.navGroup);
+                });
+                // Les événements « toggle » sont asynchrones : on ne réécoute
+                // l'utilisateur qu'une fois ceux de la restauration passés.
+                setTimeout(() => { this.restoring = false; }, 0);
+            },
+        };
+        document.addEventListener('toggle', (e) => {
+            const d = e.target;
+            if (NavGroups.restoring || !(d instanceof HTMLDetailsElement) || !d.dataset.navGroup) return;
+            const list = NavGroups.read().filter((k) => k !== d.dataset.navGroup);
+            if (!d.open) list.push(d.dataset.navGroup);
+            NavGroups.write(list);
+        }, true);
+        NavGroups.restore();
+
         /* ====== LOADER DE NAVIGATION (feedback immédiat au clic) ====== */
         const NavLoader = ABBEV.navLoader = {
             active:false, _p:0, trickle:null, overlayTimer:null, failsafe:null,
@@ -803,9 +791,10 @@
                 document.title=doc.title;
                 const nh=doc.querySelector('header h1'),ch=document.querySelector('header h1');
                 if(nh&&ch) ch.innerHTML=nh.innerHTML;
-                // Sidebar (active + badges)
+                // Sidebar (active + badges) — puis on rouvre/replie les
+                // groupes selon les préférences mémorisées.
                 const nn=doc.querySelector('aside nav'),cn=document.querySelector('aside nav');
-                if(nn&&cn) cn.innerHTML=nn.innerHTML;
+                if(nn&&cn){ cn.innerHTML=nn.innerHTML; NavGroups.restore(); }
                 // CSRF
                 const nc=doc.querySelector('meta[name="csrf-token"]'),cc=document.querySelector('meta[name="csrf-token"]');
                 if(nc&&cc) cc.content=nc.content;

@@ -1,48 +1,49 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Modifier la catégorie - ABBEV')
-@section('header', 'Modifier la catégorie')
+@section('title', 'Genre — ' . $category->name)
+@section('header', 'Genres')
 
 @section('content')
-<div class="mb-6">
-    <a href="{{ route('categories.index') }}" class="inline-flex items-center text-primary-400 hover:text-primary-300 transition">
-        <i class="fas fa-arrow-left mr-2"></i> Retour aux catégories
-    </a>
-</div>
+<x-admin.page-header :title="$category->name" :back="route('categories.index')" back-label="Retour aux genres"
+    :subtitle="$category->media_count . ' contenu(s) classé(s) dans ce genre · identifiant : ' . $category->slug" />
 
-<div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-8 max-w-2xl">
-    <form action="{{ route('categories.update', $category) }}" method="POST"
-          data-confirm="Enregistrer les modifications de la catégorie « {{ $category->name }} » ?"
-          data-confirm-type="primary" data-confirm-title="Enregistrer les modifications" data-confirm-confirm="Enregistrer">
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <form action="{{ route('categories.update', $category) }}" method="POST" class="xl:col-span-2">
         @csrf
         @method('PUT')
-
-        <div class="mb-6">
-            <label for="name" class="block text-sm font-medium text-gray-300 mb-2">
-                Nom de la catégorie <span class="text-red-400">*</span>
-            </label>
-            <input type="text" name="name" id="name" value="{{ old('name', $category->name) }}" required
-                   class="w-full bg-dark-50 border @error('name') border-red-500 @else border-dark-200 @enderror rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition">
-            @error('name')<p class="mt-2 text-sm text-red-400"><i class="fas fa-exclamation-circle mr-1"></i> {{ $message }}</p>@enderror
-        </div>
-
-        <div class="mb-8">
-            <label for="description" class="block text-sm font-medium text-gray-300 mb-2">
-                Description
-            </label>
-            <textarea name="description" id="description" rows="4"
-                      class="w-full bg-dark-50 border @error('description') border-red-500 @else border-dark-200 @enderror rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary-500 transition">{{ old('description', $category->description) }}</textarea>
-            @error('description')<p class="mt-2 text-sm text-red-400"><i class="fas fa-exclamation-circle mr-1"></i> {{ $message }}</p>@enderror
-        </div>
-
-        <div class="flex gap-4">
-            <button type="submit" class="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-lg transition flex-1">
-                <i class="fas fa-save mr-2"></i> Mettre à jour
-            </button>
-            <a href="{{ route('categories.index') }}" class="bg-dark-200 hover:bg-dark-300 text-white px-6 py-3 rounded-lg transition text-center">
-                <i class="fas fa-times mr-2"></i> Annuler
-            </a>
+        <x-admin.card title="Informations" icon="pen">
+            @include('categories._form')
+        </x-admin.card>
+        <div class="flex gap-3 mt-5">
+            <button type="submit" class="bg-primary-500 hover:bg-primary-600 text-white px-6 py-2.5 rounded-lg font-medium transition"><i class="fas fa-check mr-2"></i>Enregistrer</button>
+            <a href="{{ route('categories.index') }}" class="bg-dark-200 hover:bg-dark-300 text-white px-6 py-2.5 rounded-lg transition">Annuler</a>
         </div>
     </form>
+
+    <div id="suppression">
+        <x-admin.card title="Supprimer le genre" icon="triangle-exclamation">
+            @if($category->media_count > 0)
+                <p class="text-sm text-gray-400 mb-4">
+                    Ce genre contient <strong class="text-white">{{ $category->media_count }} contenu(s)</strong>. Choisissez le genre qui les recevra :
+                    aucun film ni aucune série n'est supprimé.
+                </p>
+            @else
+                <p class="text-sm text-gray-400 mb-4">Aucun contenu n'est classé dans ce genre : il peut être supprimé sans conséquence.</p>
+            @endif
+            <form action="{{ route('categories.destroy', $category) }}" method="POST" class="space-y-4"
+                  data-confirm="Supprimer définitivement le genre « {{ $category->name }} » ?"
+                  data-confirm-type="danger" data-confirm-title="Supprimer le genre" data-confirm-confirm="Supprimer">
+                @csrf
+                @method('DELETE')
+                @if($category->media_count > 0)
+                    <x-admin.select name="move_to" label="Transférer les contenus vers" required placeholder="— Choisir un genre —"
+                        :options="$others->pluck('name', 'id')->all()" />
+                @endif
+                <button type="submit" class="w-full bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white px-4 py-2.5 rounded-lg text-sm font-medium transition">
+                    <i class="fas fa-trash mr-2"></i>{{ $category->media_count > 0 ? 'Transférer puis supprimer' : 'Supprimer le genre' }}
+                </button>
+            </form>
+        </x-admin.card>
+    </div>
 </div>
 @endsection

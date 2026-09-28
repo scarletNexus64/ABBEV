@@ -60,8 +60,11 @@ class MediaSeeder extends Seeder
             'hasMP4Fallback'       => true,
         ];
 
-        $filmsCategory  = Category::where('slug', 'films')->firstOrFail();
-        $seriesCategory = Category::where('slug', 'series')->firstOrFail();
+        // Genre de repli d'un titre dont le genre d'origine n'est pas l'un des
+        // 15 de cat.md (les anciennes entrées « Films » / « Séries » ne sont
+        // plus des catégories : le type de média porte déjà l'information).
+        $filmsCategory  = Category::where('slug', 'drame')->firstOrFail();
+        $seriesCategory = $filmsCategory;
 
         // Map genre-slug -> Category, pour rattacher chaque titre à son genre.
         $genres = Category::whereIn('slug', collect($catalog['movies'])

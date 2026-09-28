@@ -8,6 +8,7 @@ use App\Http\Resources\MovieResource;
 use App\Http\Resources\SerieResource;
 use App\Models\Category;
 use App\Models\Media;
+use App\Support\MediaFormat;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -60,7 +61,8 @@ class MediaApiController extends Controller
     // ============================================================
     public function movies(Request $request): JsonResponse
     {
-        $items = $this->baseMovieQuery($request)->paginate($request->get('per_page', 20));
+        $items = $this->sorted($this->baseMovieQuery($request), $request)
+            ->paginate($request->get('per_page', 20));
 
         return response()->json([
             'data' => MovieResource::collection($items->items()),
@@ -146,7 +148,8 @@ class MediaApiController extends Controller
     // ============================================================
     public function series(Request $request): JsonResponse
     {
-        $items = $this->baseSerieQuery($request)->paginate($request->get('per_page', 20));
+        $items = $this->sorted($this->baseSerieQuery($request), $request)
+            ->paginate($request->get('per_page', 20));
 
         return response()->json([
             'data' => SerieResource::collection($items->items()),
@@ -204,7 +207,12 @@ class MediaApiController extends Controller
     // ============================================================
     public function categories(): JsonResponse
     {
-        $cats = Category::withCount('media')->orderBy('name')->get();
+        // Uniquement les GENRES (les autres familles de cat.md ont leur propre
+        // module), dans l'ordre éditorial de cat.md. Le compteur ne retient
+        // que les contenus réellement visibles dans l'app.
+        $cats = Category::genres()
+            ->withCount(['media' => fn ($q) => $q->published()])
+            ->get();
 
         return response()->json(['data' => CategoryResource::collection($cats)]);
     }
@@ -296,6 +304,10 @@ class MediaApiController extends Controller
         if ($request->filled('category_id')) {
             $q->where('category_id', $request->category_id);
         }
+        // Format de durée (court, moyen, long métrage) — cf. MediaFormat.
+        if (MediaFormat::isValid('movie', $request->query('format'))) {
+            $q->where('format', $request->query('format'));
+        }
         if ($request->filled('search')) {
             $s = $request->search;
             $q->where(fn ($x) => $x->where('title', 'like', "%{$s}%")->orWhere('description', 'like', "%{$s}%"));
@@ -312,12 +324,30 @@ class MediaApiController extends Controller
         if ($request->filled('category_id')) {
             $q->where('category_id', $request->category_id);
         }
+        // Format d'épisode (très court, court, moyen) — cf. MediaFormat.
+        if (MediaFormat::isValid('series', $request->query('format'))) {
+            $q->where('format', $request->query('format'));
+        }
         if ($request->filled('search')) {
             $s = $request->search;
             $q->where(fn ($x) => $x->where('title', 'like', "%{$s}%")->orWhere('description', 'like', "%{$s}%"));
         }
 
         return $q;
+    }
+
+    /**
+     * Tri optionnel des listes paginées : `sort=recent` (dernières sorties)
+     * ou `sort=popular`. Sans paramètre, l'ordre historique est conservé —
+     * l'onglet Recherche s'y appuie.
+     */
+    protected function sorted($query, Request $request)
+    {
+        return match ($request->query('sort')) {
+            'recent' => $query->orderByDesc('published_at')->orderByDesc('id'),
+            'popular' => $query->orderByDesc('views_count')->orderByDesc('id'),
+            default => $query,
+        };
     }
 
     protected function paginationMeta($paginator): array

@@ -12,29 +12,42 @@ use Illuminate\Validation\ValidationException;
 
 class ScreeningController extends Controller
 {
-    public function index()
+    /**
+     * Offres de billetterie, en deux onglets : séances en salle et codes
+     * cinéma (cat.md : « Réservation ticket — salle cinéma, achat code »).
+     */
+    public function index(Request $request)
     {
+        $kind = $request->query('kind') === 'code' ? 'code' : 'seance';
+
         $screenings = Screening::with(['media', 'ticketTypes', 'country'])
             ->withCount(['reservations as confirmed_reservations' => fn ($q) => $q->where('status', 'confirmed')])
-            ->orderByDesc('starts_at')
+            ->withSum(['reservations as redeemed_entries' => fn ($q) => $q->where('status', 'confirmed')], 'redeemed_quantity')
+            ->where('kind', $kind)
+            ->orderByDesc($kind === 'code' ? 'valid_until' : 'starts_at')
             ->get();
 
         $stats = [
-            'total'     => Screening::count(),
-            'published' => Screening::where('status', 'published')->count(),
-            'upcoming'  => Screening::where('starts_at', '>=', now())->count(),
-            'revenue'   => \App\Models\Reservation::where('status', 'confirmed')->sum('total_amount'),
+            'total'     => Screening::where('kind', $kind)->count(),
+            'published' => Screening::where('kind', $kind)->where('status', 'published')->count(),
+            'upcoming'  => Screening::where('kind', $kind)->onSale()->count(),
+            'revenue'   => \App\Models\Reservation::where('status', 'confirmed')
+                ->whereHas('screening', fn ($q) => $q->where('kind', $kind))
+                ->sum('total_amount'),
+            'seances'   => Screening::where('kind', 'seance')->count(),
+            'codes'     => Screening::where('kind', 'code')->count(),
         ];
 
-        return view('screenings.index', compact('screenings', 'stats'));
+        return view('screenings.index', compact('screenings', 'stats', 'kind'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $movies = Media::where('type', 'movie')->orderBy('title')->get(['id', 'title']);
         $countries = Country::with('currency')->where('is_active', true)->orderBy('name')->get();
+        $kind = $request->query('kind') === 'code' ? 'code' : 'seance';
 
-        return view('screenings.create', compact('movies', 'countries'));
+        return view('screenings.create', compact('movies', 'countries', 'kind'));
     }
 
     public function store(Request $request)
@@ -43,13 +56,7 @@ class ScreeningController extends Controller
         $validated = $this->resolveTitle($validated);
 
         DB::transaction(function () use ($validated, $request) {
-            $screening = Screening::create([
-                'media_id'     => $validated['media_id'] ?? null,
-                'movie_title'  => $validated['movie_title'],
-                'cinema_name'  => $validated['cinema_name'],
-                'location'     => $validated['location'],
-                'country_code' => $validated['country_code'],
-                'starts_at'    => $validated['starts_at'],
+            $screening = Screening::create($this->offerAttributes($validated) + [
                 'status'       => $request->input('status', 'published'),
                 'created_by'   => $request->user()->id,
             ]);
@@ -58,8 +65,8 @@ class ScreeningController extends Controller
             $this->syncTicketTypes($screening, $validated['ticket_types'], $currency);
         });
 
-        return redirect()->route('screenings.index')
-            ->with('success', 'Séance créée avec succès.');
+        return redirect()->route('screenings.index', ['kind' => $validated['kind']])
+            ->with('success', $validated['kind'] === 'code' ? 'Offre de codes cinéma créée.' : 'Séance créée avec succès.');
     }
 
     public function edit(Screening $screening)
@@ -77,13 +84,7 @@ class ScreeningController extends Controller
         $validated = $this->resolveTitle($validated);
 
         DB::transaction(function () use ($validated, $request, $screening) {
-            $screening->update([
-                'media_id'     => $validated['media_id'] ?? null,
-                'movie_title'  => $validated['movie_title'],
-                'cinema_name'  => $validated['cinema_name'],
-                'location'     => $validated['location'],
-                'country_code' => $validated['country_code'],
-                'starts_at'    => $validated['starts_at'],
+            $screening->update($this->offerAttributes($validated) + [
                 'status'       => $request->input('status', $screening->status),
             ]);
 
@@ -91,8 +92,8 @@ class ScreeningController extends Controller
             $this->syncTicketTypes($screening, $validated['ticket_types'], $currency);
         });
 
-        return redirect()->route('screenings.index')
-            ->with('success', 'Séance mise à jour avec succès.');
+        return redirect()->route('screenings.index', ['kind' => $validated['kind']])
+            ->with('success', $validated['kind'] === 'code' ? 'Offre de codes cinéma mise à jour.' : 'Séance mise à jour avec succès.');
     }
 
     public function destroy(Screening $screening)
@@ -112,8 +113,8 @@ class ScreeningController extends Controller
     {
         $screening->update(['status' => 'canceled']);
 
-        return redirect()->route('screenings.index')
-            ->with('success', 'Séance annulée. Elle n\'est plus réservable.');
+        return redirect()->route('screenings.index', ['kind' => $screening->kind])
+            ->with('success', 'Offre annulée : elle n\'est plus en vente.');
     }
 
     /**
@@ -163,6 +164,29 @@ class ScreeningController extends Controller
             ->delete();
     }
 
+    /**
+     * Colonnes communes à une séance et à une offre de codes. Pour un code,
+     * `starts_at` marque l'ouverture de la vente (maintenant par défaut).
+     *
+     * @param  array<string,mixed>  $validated
+     * @return array<string,mixed>
+     */
+    private function offerAttributes(array $validated): array
+    {
+        $isCode = $validated['kind'] === 'code';
+
+        return [
+            'kind'         => $validated['kind'],
+            'media_id'     => $validated['media_id'] ?? null,
+            'movie_title'  => $validated['movie_title'],
+            'cinema_name'  => $validated['cinema_name'],
+            'location'     => $validated['location'],
+            'country_code' => $validated['country_code'],
+            'starts_at'    => $isCode ? ($validated['starts_at'] ?? now()) : $validated['starts_at'],
+            'valid_until'  => $isCode ? $validated['valid_until'] : null,
+        ];
+    }
+
     private function currencyForCountry(string $countryCode): string
     {
         return Country::where('code', $countryCode)->value('currency_code') ?? 'XAF';
@@ -179,7 +203,11 @@ class ScreeningController extends Controller
             'cinema_name'           => 'required|string|max:255',
             'location'              => 'required|string|max:255',
             'country_code'          => 'required|string|size:2|exists:countries,code',
-            'starts_at'             => 'required|date',
+            'kind'                  => 'required|in:seance,code',
+            // Séance : date et heure de projection. Code : ouverture de la
+            // vente (facultative), puis date de fin de validité.
+            'starts_at'             => 'nullable|required_if:kind,seance|date',
+            'valid_until'           => 'nullable|required_if:kind,code|date|after:now',
             'status'                => 'nullable|in:draft,published,canceled',
             'ticket_types'          => 'required|array|min:1',
             'ticket_types.*.id'       => 'nullable|integer',
@@ -189,6 +217,9 @@ class ScreeningController extends Controller
         ], [
             'ticket_types.required' => 'Ajoutez au moins une catégorie de place.',
             'ticket_types.min'      => 'Ajoutez au moins une catégorie de place.',
+            'starts_at.required_if' => 'Indiquez la date et l\'heure de la séance.',
+            'valid_until.required_if' => 'Indiquez jusqu\'à quand les codes sont valables.',
+            'valid_until.after'     => 'La date de validité doit être dans le futur.',
         ]);
     }
 
@@ -207,7 +238,9 @@ class ScreeningController extends Controller
 
         if (empty($data['movie_title'])) {
             throw ValidationException::withMessages([
-                'movie_title' => 'Choisissez un film du catalogue ou saisissez un titre.',
+                'movie_title' => ($data['kind'] ?? 'seance') === 'code'
+                    ? "Donnez un nom à l'offre (ex. « Code cinéma — Duo »)."
+                    : 'Choisissez un film du catalogue ou saisissez un titre.',
             ]);
         }
 

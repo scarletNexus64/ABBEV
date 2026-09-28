@@ -16,20 +16,25 @@ class Reservation extends Model
         'ticket_type_id',
         'transaction_id',
         'quantity',
+        'redeemed_quantity',
         'unit_price',
         'total_amount',
         'currency',
         'status',
         'confirmed_at',
+        'redeemed_at',
+        'redeemed_by',
     ];
 
     protected function casts(): array
     {
         return [
-            'quantity'     => 'integer',
-            'unit_price'   => 'decimal:2',
-            'total_amount' => 'decimal:2',
-            'confirmed_at' => 'datetime',
+            'quantity'          => 'integer',
+            'redeemed_quantity' => 'integer',
+            'unit_price'        => 'decimal:2',
+            'total_amount'      => 'decimal:2',
+            'confirmed_at'      => 'datetime',
+            'redeemed_at'       => 'datetime',
         ];
     }
 
@@ -51,5 +56,16 @@ class Reservation extends Model
     public function transaction()
     {
         return $this->belongsTo(Transaction::class);
+    }
+
+    public function redeemer()
+    {
+        return $this->belongsTo(User::class, 'redeemed_by');
+    }
+
+    /** Entrées encore utilisables sur ce billet ou ce code. */
+    public function remainingEntries(): int
+    {
+        return max(0, (int) $this->quantity - (int) $this->redeemed_quantity);
     }
 }

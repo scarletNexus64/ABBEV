@@ -5,9 +5,9 @@ namespace Database\Seeders;
 use App\Models\Media;
 use App\Models\Screening;
 use App\Models\User;
+use App\Support\BusinessTime;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Carbon;
 
 /**
  * Seeder de démonstration : ~12 séances cinéma réservables, réparties sur
@@ -71,7 +71,8 @@ class ScreeningSeeder extends Seeder
         foreach ($plans as $k => $plan) {
             [$cinema, $location] = self::CINEMAS[$k % count(self::CINEMAS)];
 
-            $startsAt = Carbon::now()
+            // Heure locale de la salle (16h, 19h à Douala), pas 16h UTC.
+            $startsAt = BusinessTime::now()
                 ->addDays($plan['days_ahead'])
                 ->setTime($plan['hour'], 0);
 

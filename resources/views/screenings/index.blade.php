@@ -1,159 +1,114 @@
 @extends('admin.layouts.app')
 
-@section('title', 'Séances cinéma - ABBEV')
-@section('header', 'Séances cinéma')
+@section('title', 'Billetterie')
+@section('header', 'Billetterie')
 
 @section('content')
-<!-- Header Actions -->
-<div class="flex justify-between items-center mb-6">
-    <div>
-        <p class="text-gray-400">Programmez des séances ; les utilisateurs les voient dans l'application et réservent des places payantes.</p>
-    </div>
-    <a href="{{ route('screenings.create') }}" class="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-lg transition inline-flex items-center">
-        <i class="fas fa-plus mr-2"></i> Nouvelle séance
-    </a>
+@php $isCode = $kind === 'code'; @endphp
+<x-admin.page-header title="Séances & codes cinéma"
+    subtitle="Deux formes de billetterie : la réservation d'une séance en salle, et l'achat d'un code cinéma valable sans séance fixe. Les places ne sont décomptées qu'une fois le paiement confirmé.">
+    <x-slot:actions>
+        <a href="{{ route('tickets.check') }}" class="inline-flex items-center gap-2 bg-dark-200 hover:bg-dark-300 text-gray-100 px-4 py-2.5 rounded-lg transition"><i class="fas fa-qrcode"></i> Contrôle des billets</a>
+        <a href="{{ route('screenings.create', ['kind' => $kind]) }}" class="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-5 py-2.5 rounded-lg font-medium transition">
+            <i class="fas fa-plus text-sm"></i> {{ $isCode ? 'Nouvelle offre de codes' : 'Nouvelle séance' }}
+        </a>
+    </x-slot:actions>
+</x-admin.page-header>
+
+<div class="flex items-center gap-1 border-b border-dark-200 mb-6">
+    @foreach(['seance' => ['Séances en salle', 'film', $stats['seances']], 'code' => ['Codes cinéma', 'ticket', $stats['codes']]] as $k => [$label, $icon, $n])
+        <a href="{{ route('screenings.index', ['kind' => $k]) }}"
+           @class(['px-4 py-3 text-sm font-medium border-b-2 -mb-px transition', 'border-primary-400 text-white' => $kind === $k, 'border-transparent text-gray-400 hover:text-gray-200' => $kind !== $k])>
+            <i class="fas fa-{{ $icon }} mr-2"></i>{{ $label }} <span class="ml-1 text-xs opacity-60">{{ $n }}</span>
+        </a>
+    @endforeach
 </div>
 
-{{-- Flash affiché par le layout admin (pas de doublon ici). --}}
-
-<!-- Stats Cards -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-    <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm font-medium text-gray-400">Total séances</p>
-                <p class="text-2xl font-bold text-white mt-1">{{ $stats['total'] }}</p>
-            </div>
-            <div class="w-12 h-12 bg-primary-500/20 rounded-lg flex items-center justify-center">
-                <i class="fas fa-ticket-alt text-xl text-primary-400"></i>
-            </div>
-        </div>
-    </div>
-
-    <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm font-medium text-gray-400">Publiées</p>
-                <p class="text-2xl font-bold text-white mt-1">{{ $stats['published'] }}</p>
-            </div>
-            <div class="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <i class="fas fa-eye text-xl text-green-400"></i>
-            </div>
-        </div>
-    </div>
-
-    <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm font-medium text-gray-400">Séances à venir</p>
-                <p class="text-2xl font-bold text-white mt-1">{{ $stats['upcoming'] }}</p>
-            </div>
-            <div class="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <i class="fas fa-calendar-alt text-xl text-blue-400"></i>
-            </div>
-        </div>
-    </div>
-
-    <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm font-medium text-gray-400">Revenu réservations</p>
-                <p class="text-2xl font-bold text-white mt-1">{{ number_format($stats['revenue']) }} XAF</p>
-            </div>
-            <div class="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <i class="fas fa-money-bill-wave text-xl text-purple-400"></i>
-            </div>
-        </div>
-    </div>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <x-admin.stat :label="$isCode ? 'Offres' : 'Séances'" :value="$stats['total']" :icon="$isCode ? 'ticket' : 'film'" />
+    <x-admin.stat label="Publiées" :value="$stats['published']" icon="eye" tone="emerald" />
+    <x-admin.stat label="En vente" :value="$stats['upcoming']" icon="cart-shopping" tone="sky" :hint="$isCode ? 'Codes non expirés' : 'Séances à venir'" />
+    <x-admin.stat label="Ventes confirmées" :value="number_format($stats['revenue'], 0, ',', ' ') . ' XAF'" icon="money-bill-wave" tone="violet" />
 </div>
 
-<!-- Screenings Table -->
-<div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 overflow-hidden">
+<div class="bg-dark-100 rounded-xl border border-dark-200 overflow-hidden">
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
-            <thead class="bg-dark-50 text-gray-400 uppercase text-xs">
+            <thead class="bg-dark-50 text-gray-500 uppercase text-[11px] tracking-wider">
                 <tr>
-                    <th class="px-6 py-4 text-left">Film</th>
-                    <th class="px-6 py-4 text-left">Cinéma / Lieu</th>
-                    <th class="px-6 py-4 text-left">Séance</th>
-                    <th class="px-6 py-4 text-left">Catégories &amp; places</th>
-                    <th class="px-6 py-4 text-left">Statut</th>
-                    <th class="px-6 py-4 text-right">Actions</th>
+                    <th class="px-6 py-3 text-left">{{ $isCode ? 'Offre' : 'Film' }}</th>
+                    <th class="px-4 py-3 text-left">Cinéma / lieu</th>
+                    <th class="px-4 py-3 text-left">{{ $isCode ? 'Validité' : 'Séance' }}</th>
+                    <th class="px-4 py-3 text-left">Tarifs & ventes</th>
+                    <th class="px-4 py-3 text-left">Statut</th>
+                    <th class="px-6 py-3 text-right">Actions</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-dark-200">
                 @forelse($screenings as $s)
-                <tr class="hover:bg-dark-50/50 transition">
-                    <td class="px-6 py-4 text-white font-medium">{{ $s->movie_title }}</td>
-                    <td class="px-6 py-4 text-gray-300">
-                        <div>{{ $s->cinema_name }}</div>
-                        <div class="text-gray-500 text-xs">{{ $s->location }}</div>
-                        @if($s->country)
-                        <div class="text-gray-500 text-xs mt-1">{{ $s->country->flag_emoji }} {{ $s->country->name }}</div>
-                        @endif
-                    </td>
-                    <td class="px-6 py-4 text-gray-300">{{ $s->starts_at->format('d/m/Y H:i') }}</td>
-                    <td class="px-6 py-4 text-gray-300">
-                        @forelse($s->ticketTypes as $t)
-                        <div class="flex items-center gap-2 text-xs mb-1">
-                            <span class="px-2 py-0.5 rounded bg-dark-50 text-gray-200">{{ $t->name }}</span>
-                            <span class="text-primary-400">{{ number_format($t->price, $t->currency === 'XAF' || $t->currency === 'XOF' ? 0 : 2) }} {{ $t->currency }}</span>
-                            <span class="text-gray-500">{{ $t->sold_seats }}/{{ $t->capacity }} vendues</span>
-                        </div>
-                        @empty
-                        <span class="text-gray-500 text-xs">Aucune catégorie</span>
-                        @endforelse
-                    </td>
-                    <td class="px-6 py-4">
-                        @php
-                            $badge = [
-                                'draft'     => ['Brouillon', 'bg-gray-500/20 text-gray-400'],
-                                'published' => ['Publiée', 'bg-green-500/20 text-green-400'],
-                                'canceled'  => ['Annulée', 'bg-red-500/20 text-red-400'],
-                            ][$s->status] ?? ['—', 'bg-gray-500/20 text-gray-400'];
-                        @endphp
-                        <span class="px-3 py-1 rounded-full text-xs font-medium {{ $badge[1] }}">{{ $badge[0] }}</span>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="flex items-center justify-end gap-2">
-                            <a href="{{ route('screenings.edit', $s) }}" title="Modifier"
-                               class="bg-primary-500/20 hover:bg-primary-500 text-primary-400 hover:text-white px-3 py-2 rounded-lg transition">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            @if($s->status !== 'canceled')
-                            <form action="{{ route('screenings.cancel', $s) }}" method="POST"
-                                  data-confirm="Annuler cette séance ? Elle ne sera plus réservable."
-                                  data-confirm-type="warning" data-confirm-title="Annuler la séance" data-confirm-confirm="Annuler la séance">
-                                @csrf
-                                <button type="submit" title="Annuler"
-                                        class="bg-yellow-500/20 hover:bg-yellow-500 text-yellow-400 hover:text-white px-3 py-2 rounded-lg transition">
-                                    <i class="fas fa-ban"></i>
-                                </button>
-                            </form>
+                    @php
+                        $past = $isCode ? ($s->valid_until && $s->valid_until->isPast()) : $s->starts_at->isPast();
+                        $badge = [
+                            'draft'     => ['Brouillon', 'gray'],
+                            'published' => [$past ? ($isCode ? 'Expirée' : 'Passée') : 'En vente', $past ? 'slate' : 'emerald'],
+                            'canceled'  => ['Annulée', 'rose'],
+                        ][$s->status] ?? ['—', 'gray'];
+                    @endphp
+                    <tr class="hover:bg-dark-50/40 transition {{ $past ? 'opacity-70' : '' }}">
+                        <td class="px-6 py-3">
+                            <div class="flex items-center gap-3">
+                                <x-admin.thumb :path="$s->media?->cover_path ?: $s->media?->thumbnail_path" :icon="$isCode ? 'ticket' : 'film'" class="w-9 h-12 rounded-md" />
+                                <span class="text-white font-medium">{{ $s->movie_title }}</span>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-300">
+                            <div>{{ $s->cinema_name }}</div>
+                            <div class="text-gray-500 text-xs">{{ $s->location }} @if($s->country) · {{ $s->country->flag_emoji }} {{ $s->country->name }} @endif</div>
+                        </td>
+                        <td class="px-4 py-3 text-gray-300">
+                            @if($isCode)
+                                jusqu'au {{ $s->valid_until?->format('d/m/Y') ?? '—' }}
+                                <div class="text-xs text-gray-500">vente depuis le {{ $s->starts_at->format('d/m/Y') }}</div>
+                            @else
+                                {{ $s->starts_at->format('d/m/Y H:i') }}
                             @endif
-                            <form action="{{ route('screenings.destroy', $s) }}" method="POST"
-                                  data-confirm="Supprimer définitivement cette séance ?"
-                                  data-confirm-type="danger" data-confirm-title="Supprimer la séance" data-confirm-confirm="Supprimer">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" title="Supprimer"
-                                        class="bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white px-3 py-2 rounded-lg transition">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
+                        </td>
+                        <td class="px-4 py-3">
+                            @foreach($s->ticketTypes as $t)
+                                <div class="flex items-center gap-2 text-xs mb-1">
+                                    <span class="px-2 py-0.5 rounded bg-dark-50 text-gray-200">{{ $t->name }}</span>
+                                    <span class="text-primary-300">{{ number_format($t->price, in_array($t->currency, ['XAF', 'XOF'], true) ? 0 : 2, ',', ' ') }} {{ $t->currency }}</span>
+                                    <span class="text-gray-500">{{ $t->sold_seats }}/{{ $t->capacity }}</span>
+                                </div>
+                            @endforeach
+                            @if($s->confirmed_reservations)
+                                <div class="text-xs text-gray-500 mt-1">{{ $s->confirmed_reservations }} commande(s) · {{ (int) $s->redeemed_entries }} entrée(s) validée(s)</div>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3"><x-admin.badge :tone="$badge[1]">{{ $badge[0] }}</x-admin.badge></td>
+                        <td class="px-6 py-3">
+                            <div class="flex items-center justify-end gap-2">
+                                <a href="{{ route('screenings.edit', $s) }}" title="Modifier" class="bg-primary-500/15 hover:bg-primary-500 text-primary-300 hover:text-white px-3 py-2 rounded-lg transition"><i class="fas fa-pen"></i></a>
+                                @if($s->status !== 'canceled')
+                                    <form action="{{ route('screenings.cancel', $s) }}" method="POST"
+                                          data-confirm="Annuler cette offre ? Elle ne sera plus en vente." data-confirm-type="warning" data-confirm-title="Annuler l'offre" data-confirm-confirm="Annuler l'offre">
+                                        @csrf
+                                        <button title="Annuler" class="bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-white px-3 py-2 rounded-lg transition"><i class="fas fa-ban"></i></button>
+                                    </form>
+                                @endif
+                                <form action="{{ route('screenings.destroy', $s) }}" method="POST"
+                                      data-confirm="Supprimer définitivement cette offre ?" data-confirm-type="danger" data-confirm-title="Supprimer" data-confirm-confirm="Supprimer">
+                                    @csrf @method('DELETE')
+                                    <button title="Supprimer" class="bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white px-3 py-2 rounded-lg transition"><i class="fas fa-trash"></i></button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
                 @empty
-                <tr>
-                    <td colspan="6" class="px-6 py-12 text-center">
-                        <i class="fas fa-ticket-alt text-4xl text-gray-400 mb-3"></i>
-                        <p class="text-gray-400 mb-4">Aucune séance programmée</p>
-                        <a href="{{ route('screenings.create') }}" class="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-lg transition inline-flex items-center">
-                            <i class="fas fa-plus mr-2"></i> Créer la première séance
-                        </a>
-                    </td>
-                </tr>
+                    <tr><td colspan="6">
+                        <x-admin.empty :icon="$isCode ? 'ticket' : 'film'" :title="$isCode ? 'Aucune offre de codes cinéma' : 'Aucune séance programmée'"
+                            :text="$isCode ? 'Un code cinéma se vend comme un billet, sans séance fixe : le client le présente en caisse avant sa date d\'expiration.' : 'Programmez une séance : film, salle, date et catégories de places.'" />
+                    </td></tr>
                 @endforelse
             </tbody>
         </table>

@@ -133,7 +133,7 @@
             <h3 class="text-lg font-semibold text-white mb-4"><i class="fas fa-info-circle text-primary-400 mr-2"></i>Informations</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-2">Catégorie <span class="text-primary-400">*</span></label>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Genre <span class="text-primary-400">*</span></label>
                     <select name="category_id" required class="w-full bg-dark-50 border border-dark-200 rounded-lg px-4 py-3 text-white">
                         @foreach($categories as $category)
                             <option value="{{ $category->id }}" {{ old('category_id', $medium->category_id) == $category->id ? 'selected' : '' }}>{{ $category->name }}</option>
@@ -162,6 +162,8 @@
                 </div>
             </div>
         </div>
+
+        @include('media._classification', ['medium' => $medium, 'rubriques' => $rubriques])
 
         <!-- Visuels -->
         <div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-6">

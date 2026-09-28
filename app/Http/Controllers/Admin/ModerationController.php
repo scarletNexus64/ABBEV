@@ -42,7 +42,7 @@ class ModerationController extends Controller
     public function show(Media $medium)
     {
         $medium->load(['producer', 'category', 'reviewer', 'seasonsRelation.episodes']);
-        $categories = Category::orderBy('name')->get();
+        $categories = Category::genres()->get();
 
         // Source lisible du film (iframe Bunny ou fichier local signé) prête à
         // être lancée directement dans la page d'examen.

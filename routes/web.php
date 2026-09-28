@@ -119,7 +119,9 @@ Route::middleware(['auth', 'role:admin,producer'])->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'role:admin'])->group(function () {
-    Route::resource('categories', CategoryController::class);
+    // Genres (cat.md : 15 genres) — noms de routes `categories.*` conservés.
+    Route::resource('categories', CategoryController::class)->except(['show']);
+    Route::post('categories/reorder', [CategoryController::class, 'reorder'])->name('categories.reorder');
     // Annulation d'une séance (statut → canceled). Route hors resource.
     Route::post('screenings/{screening}/cancel', [ScreeningController::class, 'cancel'])
         ->name('screenings.cancel');
@@ -181,4 +183,73 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
         Route::get('/library',  [BunnySyncController::class, 'library'])->name('library');
         Route::post('/refresh', [BunnySyncController::class, 'refresh'])->name('refresh');
     });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Modules cat.md (admin) — talents & casting, Lions Head Awards, cours,
+| appels à projets, sélections éditoriales, contrôle des billets
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
+    // Sélections éditoriales (À la une / Avant-première / Sport / Jeux)
+    Route::get('/rubriques', [App\Http\Controllers\Admin\RubriqueController::class, 'index'])->name('rubriques.index');
+    Route::get('/rubriques/a-la-une', [App\Http\Controllers\Admin\RubriqueController::class, 'featured'])->name('rubriques.featured');
+    Route::get('/rubriques/{rubrique}/edit', [App\Http\Controllers\Admin\RubriqueController::class, 'edit'])->name('rubriques.edit');
+    Route::put('/rubriques/{rubrique}', [App\Http\Controllers\Admin\RubriqueController::class, 'update'])->name('rubriques.update');
+    Route::post('/rubriques/{rubrique}/media', [App\Http\Controllers\Admin\RubriqueController::class, 'attach'])->name('rubriques.media.attach');
+    Route::delete('/rubriques/{rubrique}/media/{media}', [App\Http\Controllers\Admin\RubriqueController::class, 'detach'])->name('rubriques.media.detach');
+    Route::post('/rubriques/{rubrique}/media/{media}/move', [App\Http\Controllers\Admin\RubriqueController::class, 'move'])->name('rubriques.media.move');
+    Route::post('/media/{media}/featured', [App\Http\Controllers\Admin\RubriqueController::class, 'toggleFeatured'])->name('rubriques.featured.toggle');
+
+    // Talents & agents
+    Route::resource('talents', App\Http\Controllers\Admin\TalentController::class)->except(['show']);
+    Route::resource('agents', App\Http\Controllers\Admin\AgentController::class)->except(['show']);
+
+    // Annonces de casting et candidatures
+    Route::resource('castings', App\Http\Controllers\Admin\CastingCallController::class)
+        ->parameters(['castings' => 'casting']);
+    Route::patch('/castings/{casting}/applications/{application}', [App\Http\Controllers\Admin\CastingCallController::class, 'review'])
+        ->name('castings.applications.review');
+    Route::get('/castings/{casting}/applications/{application}/photo', [App\Http\Controllers\Admin\CastingCallController::class, 'photo'])
+        ->name('castings.applications.photo');
+    Route::get('/castings/{casting}/export', [App\Http\Controllers\Admin\CastingCallController::class, 'export'])
+        ->name('castings.export');
+
+    // Lions Head Awards
+    Route::resource('awards', App\Http\Controllers\Admin\AwardEditionController::class)
+        ->parameters(['awards' => 'edition']);
+    Route::post('/awards/{edition}/publish', [App\Http\Controllers\Admin\AwardEditionController::class, 'publish'])->name('awards.publish');
+    Route::post('/awards/{edition}/unpublish', [App\Http\Controllers\Admin\AwardEditionController::class, 'unpublish'])->name('awards.unpublish');
+    Route::post('/awards/{edition}/current', [App\Http\Controllers\Admin\AwardEditionController::class, 'makeCurrent'])->name('awards.current');
+    Route::post('/awards/{edition}/template', [App\Http\Controllers\Admin\AwardEditionController::class, 'applyTemplate'])->name('awards.template');
+    Route::post('/awards/{edition}/categories', [App\Http\Controllers\Admin\AwardCategoryController::class, 'store'])->name('awards.categories.store');
+    Route::put('/award-categories/{category}', [App\Http\Controllers\Admin\AwardCategoryController::class, 'update'])->name('awards.categories.update');
+    Route::delete('/award-categories/{category}', [App\Http\Controllers\Admin\AwardCategoryController::class, 'destroy'])->name('awards.categories.destroy');
+    Route::post('/award-categories/{category}/nominees', [App\Http\Controllers\Admin\AwardCategoryController::class, 'storeNominee'])->name('awards.nominees.store');
+    Route::delete('/award-nominees/{nominee}', [App\Http\Controllers\Admin\AwardCategoryController::class, 'destroyNominee'])->name('awards.nominees.destroy');
+    Route::post('/award-nominees/{nominee}/winner', [App\Http\Controllers\Admin\AwardCategoryController::class, 'toggleWinner'])->name('awards.nominees.winner');
+
+    // Cours de cinéma
+    Route::resource('courses', App\Http\Controllers\Admin\CourseController::class)->except(['show']);
+    Route::post('/courses/{course}/lessons', [App\Http\Controllers\Admin\CourseController::class, 'storeLesson'])->name('courses.lessons.store');
+    Route::put('/course-lessons/{lesson}', [App\Http\Controllers\Admin\CourseController::class, 'updateLesson'])->name('courses.lessons.update');
+    Route::delete('/course-lessons/{lesson}', [App\Http\Controllers\Admin\CourseController::class, 'destroyLesson'])->name('courses.lessons.destroy');
+    Route::post('/course-lessons/{lesson}/move', [App\Http\Controllers\Admin\CourseController::class, 'moveLesson'])->name('courses.lessons.move');
+    Route::get('/course-lessons/{lesson}/file', [App\Http\Controllers\Admin\CourseController::class, 'lessonFile'])->name('courses.lessons.file');
+
+    // Appels à projets (financement, écriture, musique)
+    Route::resource('calls', App\Http\Controllers\Admin\ProjectCallController::class);
+    Route::patch('/calls/{call}/submissions/{submission}', [App\Http\Controllers\Admin\ProjectCallController::class, 'reviewSubmission'])
+        ->name('calls.submissions.review');
+    Route::get('/calls/{call}/submissions/{submission}/file', [App\Http\Controllers\Admin\ProjectCallController::class, 'submissionFile'])
+        ->name('calls.submissions.file');
+    Route::patch('/calls/{call}/pledges/{pledge}', [App\Http\Controllers\Admin\ProjectCallController::class, 'reviewPledge'])
+        ->name('calls.pledges.review');
+    Route::get('/calls/{call}/export', [App\Http\Controllers\Admin\ProjectCallController::class, 'export'])
+        ->name('calls.export');
+
+    // Contrôle des billets et codes cinéma
+    Route::get('/tickets/check', [App\Http\Controllers\Admin\TicketCheckController::class, 'index'])->name('tickets.check');
+    Route::post('/tickets/{reservation}/redeem', [App\Http\Controllers\Admin\TicketCheckController::class, 'redeem'])->name('tickets.redeem');
 });

@@ -81,7 +81,55 @@ class DashboardController extends Controller
             ? app(\App\Services\ProducerRevenueService::class)->earningsForProducer($user)
             : null;
 
-        return view('admin.dashboard', compact('stats', 'chartData', 'topCategories', 'recentMedia', 'isProducer', 'earnings'));
+        // Écosystème cat.md (admin seulement) : un chiffre clé par module et
+        // les actions qui attendent l'équipe.
+        $ecosystem = $user->isAdmin() ? $this->ecosystem() : null;
+
+        return view('admin.dashboard', compact('stats', 'chartData', 'topCategories', 'recentMedia', 'isProducer', 'earnings', 'ecosystem'));
+    }
+
+    /** Chiffres clés des modules Awards, casting, cours, appels, billetterie. */
+    private function ecosystem(): array
+    {
+        $edition = \App\Models\AwardEdition::where('is_current', true)->first();
+        $votes = $edition
+            ? \App\Models\AwardVote::whereIn('award_category_id', $edition->categories()->pluck('id'))
+            : null;
+
+        return [
+            'awards' => $edition ? [
+                'edition' => $edition,
+                'votes' => (clone $votes)->count(),
+                'voters' => (clone $votes)->distinct('user_id')->count('user_id'),
+                'today' => (clone $votes)->where('created_at', '>=', today())->count(),
+            ] : null,
+            'casting' => [
+                'open' => \App\Models\CastingCall::acceptingApplications()->count(),
+                'pending' => \App\Models\CastingApplication::where('status', 'pending')->count(),
+                'week' => \App\Models\CastingApplication::where('created_at', '>=', now()->subDays(7))->count(),
+            ],
+            'talents' => [
+                'actors' => \App\Models\Talent::where('kind', 'acteur')->count(),
+                'technicians' => \App\Models\Talent::where('kind', 'technicien')->count(),
+                'agents' => \App\Models\Agent::count(),
+            ],
+            'courses' => [
+                'published' => \App\Models\Course::where('is_published', true)->count(),
+                'lessons' => \App\Models\CourseLesson::count(),
+            ],
+            'calls' => [
+                'open' => \App\Models\ProjectCall::where('status', 'open')->count(),
+                'submissions' => \App\Models\ProjectSubmission::where('status', 'received')->count(),
+                'pledges' => \App\Models\ProjectPledge::where('status', 'pending')->count(),
+                'confirmed' => (float) \App\Models\ProjectPledge::where('status', 'confirmed')->sum('amount'),
+            ],
+            'tickets' => [
+                'seances' => \App\Models\Screening::where('kind', 'seance')->onSale()->count(),
+                'codes' => \App\Models\Screening::where('kind', 'code')->onSale()->count(),
+                'sold' => \App\Models\Reservation::where('status', 'confirmed')->where('confirmed_at', '>=', now()->startOfMonth())->sum('quantity'),
+            ],
+            'moderation' => Media::where('moderation_status', 'pending')->count(),
+        ];
     }
 
     /**

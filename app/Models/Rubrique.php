@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\Concerns\HasTranslations;
+use App\Support\TierAccess;
 
 /**
  * Section thématique mise en avant dans l'app mobile (chips d'accueil).
@@ -67,28 +68,6 @@ class Rubrique extends Model
      */
     public function isAccessibleBy(?User $user): bool
     {
-        if ($this->required_tier === null) {
-            return true;
-        }
-
-        if (! $user) {
-            return false;
-        }
-
-        $subscription = UserSubscription::where('user_id', $user->id)
-            ->where('status', 'active')
-            ->where('expires_at', '>', now())
-            ->with('plan')
-            ->orderByDesc('expires_at')
-            ->first();
-
-        $userTier = $subscription?->plan?->tier;
-
-        if (! $userTier) {
-            return false;
-        }
-
-        return array_search($userTier, self::TIERS, true)
-            >= array_search($this->required_tier, self::TIERS, true);
+        return TierAccess::allows($user, $this->required_tier);
     }
 }

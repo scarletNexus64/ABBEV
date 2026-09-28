@@ -90,6 +90,39 @@ return [
         'not_enough_seats'  => 'Plus assez de places disponibles dans cette catégorie.',
         'cancelled_cannot_confirm' => 'Réservation annulée, impossible de confirmer.',
         'not_enough_to_confirm' => 'Plus assez de places pour confirmer cette réservation.',
+        'already_used' => 'Ce billet a déjà été utilisé au contrôle : il ne peut plus être annulé.',
+    ],
+
+    // ---- Lions Head Awards ------------------------------------------------
+    'awards' => [
+        'no_edition'     => "Aucune édition des Lions Head Awards n'est en cours.",
+        'voting_closed'  => "Le vote n'est pas ouvert pour cette catégorie.",
+        'voted'          => 'Votre vote a bien été enregistré.',
+        'vote_changed'   => 'Votre vote a été mis à jour.',
+    ],
+
+    // ---- Talents & casting -----------------------------------------------
+    'casting' => [
+        'closed'          => "Cette annonce n'accepte plus de candidatures.",
+        'already_applied' => 'Vous avez déjà postulé à ce rôle.',
+        'applied'         => 'Candidature envoyée. La production vous recontactera si votre profil est retenu.',
+    ],
+
+    // ---- Cours de cinéma --------------------------------------------------
+    'courses' => [
+        'locked'     => 'Cette leçon est réservée aux abonnés.',
+        'no_content' => "Cette leçon n'est pas encore disponible.",
+    ],
+
+    // ---- Appels à projets -------------------------------------------------
+    'calls' => [
+        'closed'            => "Cet appel n'accepte plus de participations.",
+        'already_submitted' => 'Vous avez déjà envoyé une candidature pour cet appel.',
+        'submitted'         => 'Candidature envoyée. Vous serez informé(e) de la suite donnée.',
+        'funding_only'      => 'Cet appel ne reçoit pas de promesses de soutien.',
+        'no_funding'        => "Un appel à financement se soutient par une promesse, pas par une candidature.",
+        'pledge_min'        => 'Le montant minimum de soutien est de :amount.',
+        'pledged'           => "Merci ! Votre promesse de soutien est enregistrée : l'équipe ABBEV vous contactera pour la finaliser.",
     ],
 
     // ---- Administration (panel) ----------------------------------------

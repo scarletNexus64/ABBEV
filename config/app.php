@@ -68,6 +68,13 @@ return [
     'timezone' => 'UTC',
 
     /*
+    | Fuseau « métier » : celui dans lequel l'équipe saisit les horaires
+    | d'événements (séances, votes, clôtures d'appels). Le stockage reste en
+    | UTC ; voir App\Casts\BusinessDateTime.
+    */
+    'business_timezone' => env('APP_BUSINESS_TIMEZONE', 'Africa/Douala'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------

@@ -94,8 +94,10 @@ class ContentTranslationTest extends TestCase
 
     public function test_le_seeder_traduit_le_contenu_et_reste_idempotent(): void
     {
+        // Le seeder est indexé sur le SLUG (clé stable du référentiel), pas
+        // sur le libellé : un genre se reconnaît à son slug de cat.md.
         Category::create(['name' => 'Comédie', 'slug' => 'comedie']);
-        Category::create(['name' => 'Science-Fiction', 'slug' => 'sf']);
+        Category::create(['name' => 'Science-Fiction', 'slug' => 'science-fiction']);
 
         $this->seed(TranslationSeeder::class);
         $countAfterFirstRun = DB::table('translations')->count();
@@ -107,7 +109,7 @@ class ContentTranslationTest extends TestCase
 
         App::setLocale('en');
         $this->assertSame('Comedy', Category::where('slug', 'comedie')->first()->t('name'));
-        $this->assertSame('Science Fiction', Category::where('slug', 'sf')->first()->t('name'));
+        $this->assertSame('Science Fiction', Category::where('slug', 'science-fiction')->first()->t('name'));
     }
 
     public function test_lapi_renvoie_les_categories_traduites(): void
