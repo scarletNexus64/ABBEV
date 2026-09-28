@@ -86,6 +86,29 @@ class LionsHeadAwardsTest extends TestCase
         $this->assertDatabaseCount('award_votes', 1);
     }
 
+    public function test_le_palmares_ne_compte_plus_les_votes_d_un_compte_supprime(): void
+    {
+        [$awa, $grace] = [$this->nominees[0], $this->nominees[1]];
+        $leaving = User::factory()->create();
+        foreach ([$leaving, User::factory()->create()] as $voter) {
+            $this->actingAs($voter, 'sanctum')->postJson("/api/v1/awards/nominees/{$awa->id}/vote")->assertOk();
+        }
+        foreach (User::factory()->count(3)->create() as $voter) {
+            $this->actingAs($voter, 'sanctum')->postJson("/api/v1/awards/nominees/{$grace->id}/vote")->assertOk();
+        }
+
+        // Les bulletins partent avec le compte (cascade), pas le compteur.
+        $leaving->delete();
+        $this->assertSame(2, $awa->fresh()->votes_count);
+
+        app(AwardVotingService::class)->publishResults($this->edition);
+
+        $this->assertSame(1, $awa->fresh()->votes_count, 'recompté depuis les bulletins');
+        $this->assertSame(3, $grace->fresh()->votes_count);
+        $this->assertTrue($grace->fresh()->is_winner);
+        $this->assertFalse($awa->fresh()->is_winner);
+    }
+
     public function test_vote_refuse_hors_periode(): void
     {
         $this->edition->update(['voting_ends_at' => now()->subMinute()]);

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Course;
 use App\Models\ProjectCall;
 use App\Models\ProjectPledge;
+use App\Models\ProjectSubmission;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Models\UserSubscription;
@@ -136,6 +137,42 @@ class CoursesAndCallsTest extends TestCase
             ->assertJsonPath('data.progress_percent', 50)
             ->assertJsonPath('data.backers_count', 1);
         $this->assertNotNull($pledge->fresh()->confirmed_at);
+    }
+
+    public function test_une_promesse_confirmee_survit_a_la_suppression_du_compte(): void
+    {
+        $call = $this->projectCall('financement', ['goal_amount' => 100000]);
+        $backer = User::factory()->create();
+        $pledge = ProjectPledge::create([
+            'project_call_id' => $call->id, 'user_id' => $backer->id, 'amount' => 40000,
+            'currency' => 'XAF', 'status' => 'confirmed', 'confirmed_at' => now(),
+        ]);
+
+        $backer->delete();
+
+        $this->assertNull($pledge->fresh()->user_id, 'détachée du compte, pas effacée');
+        $this->getJson("/api/v1/calls/{$call->id}")->assertJsonPath('data.raised_amount', 40000);
+    }
+
+    public function test_supprimer_son_compte_efface_ses_scenarios_et_photos(): void
+    {
+        Storage::fake('local');
+        $call = $this->projectCall('ecriture');
+        $user = User::factory()->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->post("/api/v1/calls/{$call->id}/submissions", [
+                'title' => 'Le Fleuve', 'synopsis' => 'Un récit.',
+                'file' => UploadedFile::fake()->create('scenario.pdf', 200, 'application/pdf'),
+            ], ['Accept' => 'application/json'])
+            ->assertCreated();
+        $path = ProjectSubmission::first()->file_path;
+        Storage::disk('local')->assertExists($path);
+
+        $user->delete();
+
+        Storage::disk('local')->assertMissing($path);
+        $this->assertDatabaseCount('project_submissions', 0);
     }
 
     public function test_une_candidature_musique_exige_un_lien_d_ecoute(): void

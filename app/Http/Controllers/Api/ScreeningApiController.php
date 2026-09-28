@@ -19,6 +19,9 @@ class ScreeningApiController extends Controller
 {
     use ResolvesMediaUrls;
 
+    /** @var array<string, array{currency_symbol: string, currency_decimals: int}> */
+    private array $currencyMetaCache = [];
+
     public function __construct(private ReservationService $reservations)
     {
     }
@@ -307,11 +310,18 @@ class ScreeningApiController extends Controller
      */
     private function currencyMeta(?string $code): array
     {
+        // Mémorisé par requête : une liste de séances répète la même devise
+        // sur chaque tarif (une requête SQL par tarif auparavant).
+        $key = strtoupper((string) $code);
+        if (isset($this->currencyMetaCache[$key])) {
+            return $this->currencyMetaCache[$key];
+        }
+
         $currency = $code
-            ? Currency::where('code', strtoupper($code))->first()
+            ? Currency::where('code', $key)->first()
             : null;
 
-        return [
+        return $this->currencyMetaCache[$key] = [
             'currency_symbol'   => $currency?->symbol ?: ($code ?? ''),
             'currency_decimals' => (int) ($currency?->decimals ?? 0),
         ];

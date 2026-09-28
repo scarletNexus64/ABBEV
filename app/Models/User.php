@@ -9,12 +9,37 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasObfuscatedRouteKey, Notifiable;
+
+    /** Fichiers personnels à effacer une fois la suppression du compte confirmée. */
+    private array $personalFilesToForget = [];
+
+    protected static function booted(): void
+    {
+        // Suppression d'un compte (depuis l'app ou l'admin) : candidatures et
+        // propositions partent en cascade avec lui, mais pas les fichiers
+        // qu'elles référencent. Photos de candidats et scénarios sont des
+        // données personnelles : on les efface avec le compte — après la
+        // suppression en base, pour ne rien perdre si elle échoue.
+        static::deleting(function (User $user) {
+            $user->personalFilesToForget = CastingApplication::where('user_id', $user->id)
+                ->whereNotNull('photo_path')->pluck('photo_path')
+                ->merge(ProjectSubmission::where('user_id', $user->id)->whereNotNull('file_path')->pluck('file_path'))
+                ->all();
+        });
+
+        static::deleted(function (User $user) {
+            if ($user->personalFilesToForget !== []) {
+                Storage::disk('local')->delete($user->personalFilesToForget);
+            }
+        });
+    }
 
     /**
      * Email de réinitialisation de mot de passe : version française brandée

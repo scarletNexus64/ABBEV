@@ -18,6 +18,7 @@ use App\Models\Talent;
 use App\Support\MediaFormat;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -34,11 +35,37 @@ class ExploreApiController extends Controller
     /** Sélections éditoriales exposées comme sections à part entière. */
     private const RUBRIQUES = ['avant-premiere', 'sport', 'jeux'];
 
+    /** Durée de vie du sommaire partagé : des compteurs, pas des stocks. */
+    private const SHARED_TTL = 60;
+
     public function __invoke(Request $request): JsonResponse
     {
         $user = $request->user('sanctum');
 
-        return response()->json(['data' => [
+        // Tout ce qui ne dépend pas de l'utilisateur est commun à tous (par
+        // langue) : mis en cache une minute. C'est l'écran pivot de l'app ;
+        // sans cache, chaque ouverture coûtait une vingtaine de requêtes.
+        $shared = Cache::remember(
+            'explore.summary.' . app()->getLocale(),
+            self::SHARED_TTL,
+            fn () => $this->sharedSummary($request),
+        );
+
+        return response()->json(['data' => $shared + [
+            // Propres à l'utilisateur : forfait (sélections verrouillées) et
+            // pays (billetterie).
+            'rubriques' => $this->rubriques($request, $user),
+            'tickets' => [
+                'screenings' => $this->ticketOffers($user, 'seance'),
+                'codes' => $this->ticketOffers($user, 'code'),
+            ],
+        ]]);
+    }
+
+    /** @return array<string, mixed> */
+    private function sharedSummary(Request $request): array
+    {
+        return [
             'featured' => [
                 'featured_count' => Media::published()->where('is_featured', true)->count(),
                 'new_count' => Media::published()->where('published_at', '>=', now()->subDays(30))->count(),
@@ -50,7 +77,6 @@ class ExploreApiController extends Controller
                     ->withCount(['media' => fn ($q) => $q->published()])
                     ->get()
             )->resolve($request),
-            'rubriques' => $this->rubriques($request, $user),
             'awards' => $this->awards(),
             'talents' => [
                 'actors' => Talent::published()->where('kind', 'acteur')->count(),
@@ -63,11 +89,7 @@ class ExploreApiController extends Controller
                 'document' => Course::published()->where('type', 'document')->count(),
             ],
             'calls' => $this->openCalls(),
-            'tickets' => [
-                'screenings' => $this->ticketOffers($user, 'seance'),
-                'codes' => $this->ticketOffers($user, 'code'),
-            ],
-        ]]);
+        ];
     }
 
     /** @return array{total: int, formats: array<string, int>} */

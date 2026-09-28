@@ -107,6 +107,8 @@ class AwardVotingService
     public function publishResults(AwardEdition $edition): void
     {
         DB::transaction(function () use ($edition) {
+            $this->recount($edition);
+
             foreach ($edition->categories()->with('nominees')->get() as $category) {
                 if ($category->nominees->contains('is_winner', true)) {
                     continue;
@@ -124,6 +126,21 @@ class AwardVotingService
 
             $edition->forceFill(['results_published_at' => now()])->save();
         });
+    }
+
+    /**
+     * Recalcule les compteurs depuis les bulletins. Ils suivent chaque vote
+     * en temps réel, mais la suppression d'un compte emporte ses bulletins
+     * (cascade) sans les décompter : le palmarès repart donc des bulletins.
+     */
+    public function recount(AwardEdition $edition): void
+    {
+        AwardNominee::whereIn('award_category_id', $edition->categories()->reorder()->select('id'))
+            ->update([
+                'votes_count' => DB::raw(
+                    '(select count(*) from award_votes where award_votes.award_nominee_id = award_nominees.id)'
+                ),
+            ]);
     }
 
     /** Retire la publication (les lauréats désignés sont conservés). */

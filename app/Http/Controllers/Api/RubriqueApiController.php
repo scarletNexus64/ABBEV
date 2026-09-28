@@ -93,7 +93,8 @@ class RubriqueApiController extends Controller
         // content_type = 'media' : on ne renvoie que les contenus réellement
         // visibles (publiés + modération approuvée), séparés par type pour
         // coller aux deux listes distinctes de l'écran mobile.
-        $media = $rubrique->media()->published()->get();
+        // Catégorie chargée d'avance : les ressources film/série l'exposent (N+1 sinon).
+        $media = $rubrique->media()->published()->with('category')->get();
 
         return response()->json([
             'type' => 'media',
