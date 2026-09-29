@@ -79,7 +79,7 @@ class AwardEditionController extends Controller
     /** Tableau de bord d'une édition : prix, nommés, résultats en direct. */
     public function show(Request $request, AwardEdition $edition)
     {
-        $edition->load(['categories.nominees.media', 'categories.nominees.talent']);
+        $edition->load(['categories.translations', 'categories.nominees.media', 'categories.nominees.talent']);
 
         $votes = AwardVote::whereIn('award_category_id', $edition->categories->pluck('id'));
 

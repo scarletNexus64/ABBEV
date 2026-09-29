@@ -30,9 +30,12 @@ class ProducerRevenueService
     }
 
     /** Tarifs des trois tiers (pour l'admin / la simulation). */
+    /** Tarifs lus une fois par instance (la page des revenus boucle sur les producteurs). */
+    private ?array $rates = null;
+
     public function rates(): array
     {
-        return [
+        return $this->rates ??= [
             'classique' => $this->ratePerView('classique'),
             'standard'  => $this->ratePerView('standard'),
             'premium'   => $this->ratePerView('premium'),

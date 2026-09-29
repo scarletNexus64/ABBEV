@@ -88,7 +88,7 @@ Route::middleware(['auth', 'role:producer'])->prefix('admin/team')->name('team.'
 
 // Œuvres adaptables
 Route::middleware(['auth', 'role:admin,producer', 'module:oeuvres'])->group(function () {
-    Route::resource('oeuvres', OeuvreController::class);
+    Route::resource('oeuvres', OeuvreController::class)->except(['show']);
 });
 
 // Films, séries, épisodes et upload vidéos
@@ -180,7 +180,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     // Revenus producteurs (comptes dus + simulation des tarifs)
     Route::get('/earnings', [App\Http\Controllers\ProducerEarningsController::class, 'index'])->name('earnings.index');
 
-    Route::resource('subscription-plans', App\Http\Controllers\SubscriptionPlanController::class);
+    Route::resource('subscription-plans', App\Http\Controllers\SubscriptionPlanController::class)->except(['show']);
     Route::get('/transactions', [App\Http\Controllers\TransactionController::class, 'index'])->name('transactions.index');
     Route::get('/transactions/{transaction}', [App\Http\Controllers\TransactionController::class, 'show'])->name('transactions.show');
 
@@ -281,7 +281,7 @@ Route::middleware(['auth', 'role:admin,producer', 'module:ticketing'])->group(fu
     // Annulation d'une séance (statut → canceled). Route hors resource.
     Route::post('screenings/{screening}/cancel', [ScreeningController::class, 'cancel'])
         ->name('screenings.cancel');
-    Route::resource('screenings', ScreeningController::class);
+    Route::resource('screenings', ScreeningController::class)->except(['show']);
 });
 
 Route::middleware(['auth', 'role:admin,producer', 'module:tickets'])->prefix('admin')->group(function () {

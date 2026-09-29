@@ -8,3 +8,7 @@ php artisan optimize
 php artisan view:clear
 php artisan config:clear
 php artisan route:cache
+
+- URL : http://localhost:8001/admin/login
+- Email : producteur.test@abbev.local
+- Mot de passe : fIluMa6ez6ybrl

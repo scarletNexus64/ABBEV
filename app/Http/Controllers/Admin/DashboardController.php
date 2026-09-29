@@ -150,11 +150,16 @@ class DashboardController extends Controller
      */
     private function getLast30DaysData($query)
     {
+        // Une seule requête groupée par jour (au lieu d'une par jour).
+        $counts = (clone $query)
+            ->where('created_at', '>=', Carbon::now()->subDays(29)->startOfDay())
+            ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
+            ->groupBy('day')
+            ->pluck('total', 'day');
+
         $data = [];
         for ($i = 29; $i >= 0; $i--) {
-            $date = Carbon::now()->subDays($i)->toDateString();
-            $count = (clone $query)->whereDate('created_at', $date)->count();
-            $data[] = $count;
+            $data[] = (int) ($counts[Carbon::now()->subDays($i)->toDateString()] ?? 0);
         }
         return $data;
     }
