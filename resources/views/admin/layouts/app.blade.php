@@ -303,17 +303,18 @@
             @php
                 $__user = auth()->user();
                 $__isAdmin = $__user->isAdmin();
-                $__isAssistant = $__user->isAssistant();
+                $__can = fn (string $module) => $__user->canAccessModule($module);
                 // Compteurs « à traiter » : un chiffre n'apparaît que s'il
-                // demande une action de l'équipe.
-                $__pendingModeration = ($__isAdmin || $__isAssistant)
+                // demande une action de l'équipe. Les requêtes sont déjà
+                // cloisonnées à l'espace du producteur (scope `workspace`).
+                $__pendingModeration = $__can('moderation')
                     ? \App\Models\Media::where('moderation_status', 'pending')->count() : 0;
-                $__pendingApplications = $__isAdmin
+                $__pendingApplications = $__can('talents')
                     ? \App\Models\CastingApplication::where('status', 'pending')->count() : 0;
-                $__pendingCalls = $__isAdmin
+                $__pendingCalls = $__can('calls')
                     ? \App\Models\ProjectSubmission::where('status', 'received')->count()
                       + \App\Models\ProjectPledge::where('status', 'pending')->count() : 0;
-                $__votingOpen = $__isAdmin
+                $__votingOpen = $__can('awards')
                     && optional(\App\Models\AwardEdition::where('is_current', true)->first())->isVotingOpen();
             @endphp
             <nav class="flex-1 mt-4 px-3 pb-6 overflow-y-auto abbev-scroll">
@@ -322,20 +323,25 @@
                 </x-admin.nav-link>
 
                 {{-- Catalogue : films, séries et leur classement (genres, formats, sélections) --}}
-                @unless($__isAssistant)
+                @if($__can('contents') || $__can('oeuvres') || $__isAdmin)
                 <x-admin.nav-group key="catalogue" label="Catalogue"
                     :active="request()->routeIs('films.*', 'series.*', 'media.*', 'episodes.*', 'categories.*', 'rubriques.*', 'oeuvres.*', 'admin.bunny.*')">
+                    @if($__can('contents'))
                     <x-admin.nav-link :href="route('films.index')" icon="film" :active="request()->routeIs('films.*')">Films</x-admin.nav-link>
                     <x-admin.nav-link :href="route('series.index')" icon="tv" :active="request()->routeIs('series.*')">Séries & feuilletons</x-admin.nav-link>
+                    @endif
                     @if($__isAdmin)
                     <x-admin.nav-link :href="route('categories.index')" icon="masks-theater" :active="request()->routeIs('categories.*')">Genres</x-admin.nav-link>
                     <x-admin.nav-link :href="route('rubriques.index')" icon="star" :active="request()->routeIs('rubriques.*')">Sélections éditoriales</x-admin.nav-link>
                     @endif
+                    @if($__can('oeuvres'))
                     <x-admin.nav-link :href="route('oeuvres.index')" icon="book-open" :active="request()->routeIs('oeuvres.*')">Œuvres adaptables</x-admin.nav-link>
+                    @endif
+                    @if($__can('contents'))
                     @php
                         $__activeUploadsQuery = \App\Models\BunnyUpload::whereNotIn('status', \App\Models\BunnyUpload::TERMINAL);
-                        if ($__user->role === 'producer') {
-                            $__activeUploadsQuery->where('user_id', $__user->id);
+                        if ($__user->isProducer()) {
+                            $__activeUploadsQuery->where('user_id', $__user->workspaceId());
                         }
                         $__activeUploads = $__activeUploadsQuery->count();
                         $__uploadsActive = request()->routeIs('admin.bunny.uploads.*') || request()->routeIs('admin.bunny.upload.*');
@@ -348,47 +354,73 @@
                         <span class="flex-1 truncate">Upload vidéos</span>
                         <span id="sidebar-upload-badge" class="text-[10px] font-bold px-1.5 min-w-[20px] text-center py-0.5 rounded-full bg-blue-500 text-white animate-pulse {{ $__activeUploads > 0 ? '' : 'hidden' }}">{{ $__activeUploads }}</span>
                     </a>
+                    @endif
                     @if($__isAdmin)
                     <x-admin.nav-link :href="route('admin.bunny.library')" icon="cloud" :active="request()->routeIs('admin.bunny.library') || request()->routeIs('admin.bunny.videos.*')">Bunny Library</x-admin.nav-link>
                     @endif
                 </x-admin.nav-group>
-                @endunless
+                @endif
 
-                @if($__isAdmin || $__isAssistant)
-                <x-admin.nav-group key="moderation" label="Validation" :active="request()->routeIs('moderation.*')">
+                @if($__can('moderation') || $__can('audience'))
+                <x-admin.nav-group key="moderation" label="Validation & audience" :active="request()->routeIs('moderation.*', 'audience.*')">
+                    @if($__can('moderation'))
                     <x-admin.nav-link :href="route('moderation.index')" icon="clipboard-check" :active="request()->routeIs('moderation.*')" :badge="$__pendingModeration ?: null">Modération</x-admin.nav-link>
+                    @endif
+                    @if($__can('audience'))
+                    <x-admin.nav-link :href="route('audience.index')" icon="chart-line" :active="request()->routeIs('audience.*')">Audience</x-admin.nav-link>
+                    @endif
                 </x-admin.nav-group>
                 @endif
 
-                @if($__isAdmin)
+                @if($__can('talents'))
                 <x-admin.nav-group key="talents" label="Talents & casting" :active="request()->routeIs('talents.*', 'agents.*', 'castings.*')">
                     <x-admin.nav-link :href="route('talents.index')" icon="id-badge" :active="request()->routeIs('talents.*')">Talents</x-admin.nav-link>
                     <x-admin.nav-link :href="route('agents.index')" icon="user-tie" :active="request()->routeIs('agents.*')">Agents</x-admin.nav-link>
                     <x-admin.nav-link :href="route('castings.index')" icon="bullhorn" :active="request()->routeIs('castings.*')" :badge="$__pendingApplications ?: null">Annonces casting</x-admin.nav-link>
                 </x-admin.nav-group>
+                @endif
 
+                @if($__can('awards'))
                 <x-admin.nav-group key="awards" label="Lions Head Awards" :active="request()->routeIs('awards.*')">
                     <x-admin.nav-link :href="route('awards.index')" icon="trophy" :active="request()->routeIs('awards.*')"
                         :badge="$__votingOpen ? 'LIVE' : null" badge-class="bg-emerald-500 text-white">Éditions & votes</x-admin.nav-link>
                 </x-admin.nav-group>
+                @endif
 
+                @if($__can('courses'))
                 <x-admin.nav-group key="formation" label="Formation" :active="request()->routeIs('courses.*')">
                     <x-admin.nav-link :href="route('courses.index')" icon="graduation-cap" :active="request()->routeIs('courses.*')">Cours de cinéma</x-admin.nav-link>
                 </x-admin.nav-group>
+                @endif
 
+                @if($__can('calls'))
                 <x-admin.nav-group key="appels" label="Appels à projets" :active="request()->routeIs('calls.*')">
                     <x-admin.nav-link :href="route('calls.index')" icon="lightbulb" :active="request()->routeIs('calls.*')" :badge="$__pendingCalls ?: null">Financement, écriture, musique</x-admin.nav-link>
                 </x-admin.nav-group>
+                @endif
 
+                @if($__can('ticketing') || $__can('tickets'))
                 <x-admin.nav-group key="billetterie" label="Billetterie" :active="request()->routeIs('screenings.*', 'tickets.*')">
+                    @if($__can('ticketing'))
                     <x-admin.nav-link :href="route('screenings.index')" icon="ticket" :active="request()->routeIs('screenings.*')">Séances & codes cinéma</x-admin.nav-link>
+                    @endif
+                    @if($__can('tickets'))
                     <x-admin.nav-link :href="route('tickets.check')" icon="qrcode" :active="request()->routeIs('tickets.*')">Contrôle des billets</x-admin.nav-link>
+                    @endif
                 </x-admin.nav-group>
+                @endif
 
-                <x-admin.nav-group key="utilisateurs" label="Utilisateurs" :active="request()->routeIs('users.*', 'administrators.*', 'producers.*', 'assistants.*')">
+                @if($__user->isProducerOwner())
+                <x-admin.nav-group key="equipe" label="Mon espace" :active="request()->routeIs('team.*')">
+                    <x-admin.nav-link :href="route('team.index')" icon="people-group" :active="request()->routeIs('team.*')">Équipe & permissions</x-admin.nav-link>
+                </x-admin.nav-group>
+                @endif
+
+                @if($__isAdmin)
+                <x-admin.nav-group key="utilisateurs" label="Utilisateurs" :active="request()->routeIs('users.*', 'administrators.*', 'producers.*', 'transfers.*')">
                     <x-admin.nav-link :href="route('users.index')" icon="users" :active="request()->routeIs('users.*')">Abonnés</x-admin.nav-link>
                     <x-admin.nav-link :href="route('producers.index')" icon="clapperboard" :active="request()->routeIs('producers.*')">Producteurs</x-admin.nav-link>
-                    <x-admin.nav-link :href="route('assistants.index')" icon="user-check" :active="request()->routeIs('assistants.*')">Assistants</x-admin.nav-link>
+                    <x-admin.nav-link :href="route('transfers.index')" icon="right-left" :active="request()->routeIs('transfers.*')">Transfert de données</x-admin.nav-link>
                     <x-admin.nav-link :href="route('administrators.index')" icon="user-shield" :active="request()->routeIs('administrators.*')">Administrateurs</x-admin.nav-link>
                 </x-admin.nav-group>
 
@@ -412,7 +444,7 @@
                     </div>
                     <div class="ml-3 flex-1">
                         <p class="text-sm font-medium text-white">{{ auth()->user()->name ?? 'Admin' }}</p>
-                        <p class="text-xs text-gray-400">{{ auth()->user()->isProducer() ? 'Producteur' : (auth()->user()->isAssistant() ? 'Assistant' : 'Administrateur') }}</p>
+                        <p class="text-xs text-gray-400">{{ auth()->user()->isTeamMember() ? 'Équipe · ' . auth()->user()->producer?->name : (auth()->user()->isProducer() ? 'Producteur' : 'Administrateur') }}</p>
                     </div>
                     <form action="{{ route('admin.logout') }}" method="POST">
                         @csrf

@@ -29,8 +29,13 @@
         </x-admin.card>
         <x-admin.card title="Options" icon="sliders">
             <div class="space-y-4">
+                @if(auth()->user()->isAdmin())
                 <x-admin.toggle name="is_current" label="Afficher cette édition dans l'app" :checked="$edition->is_current || ! $edition->exists"
                     hint="Une seule édition à la fois : elle remplace la précédente dans l'écran « Lions Head Awards »." />
+                @else
+                <p class="text-xs text-gray-400"><i class="fas fa-mobile-screen mr-1"></i>
+                    L'app n'affiche qu'une édition à la fois : l'administration ABBEV choisit laquelle.</p>
+                @endif
                 @unless($edition->exists)
                     <x-admin.toggle name="apply_template" label="Créer les 29 prix officiels" :checked="true"
                         hint="Cinéma (13), Télévision (13), Métiers (3). Modifiables ensuite." />

@@ -32,7 +32,8 @@ trait HasSlug
         $slug = $base;
         $n = 1;
 
-        while (static::query()
+        // Unicité sur toute la table, tous espaces producteurs confondus.
+        while (static::query()->withoutGlobalScope('workspace')
             ->where('slug', $slug)
             ->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))
             ->exists()) {

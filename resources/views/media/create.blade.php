@@ -176,7 +176,7 @@
                         @endforeach
                     </select>
                     @error('category_id')<p class="text-red-400 text-sm mt-1">{{ $message }}</p>@enderror
-                    <p class="mt-2 text-xs text-gray-500"><i class="fas fa-info-circle mr-1"></i>Le tier (Classique/Standard/Premium) est attribué par l'assistant lors de la validation.</p>
+                    <p class="mt-2 text-xs text-gray-500"><i class="fas fa-info-circle mr-1"></i>Le tier (Classique/Standard/Premium) est attribué par l'administration ABBEV.</p>
                 </div>
 
                 <div>

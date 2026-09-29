@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspace;
 use App\Casts\BusinessDateTime;
 use App\Concerns\HasObfuscatedRouteKey;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Screening extends Model
 {
-    use HasFactory, HasObfuscatedRouteKey;
+    use BelongsToWorkspace, HasFactory, HasObfuscatedRouteKey;
 
     public const KINDS = [
         'seance' => 'Séance en salle',

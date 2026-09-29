@@ -175,7 +175,7 @@ class EpisodeController extends Controller
     protected function authorizeMediaOwnership(?Media $media): void
     {
         $user = auth()->user();
-        if ($user && $user->isProducer() && (! $media || $media->user_id !== $user->id)) {
+        if ($user && $user->isProducer() && (! $media || $media->user_id !== $user->workspaceId())) {
             abort(403, "Cette série ne vous appartient pas.");
         }
     }
@@ -232,7 +232,7 @@ class EpisodeController extends Controller
 
     protected function isBunnyVideoTaken(string $guid): bool
     {
-        $inMedia = Media::where('video_provider', 'bunny')->where('video_id', $guid)->exists();
+        $inMedia = Media::withoutGlobalScope('workspace')->where('video_provider', 'bunny')->where('video_id', $guid)->exists();
         if ($inMedia) {
             return true;
         }

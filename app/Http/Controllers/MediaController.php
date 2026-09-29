@@ -98,10 +98,13 @@ class MediaController extends Controller
         }
 
         $data = $this->mediaPayload($request, $validated);
-        $data['user_id'] = auth()->id(); // propriétaire = créateur (producteur ou admin)
+        // Propriétaire = le producteur de l'espace (même si c'est un membre de
+        // son équipe qui ajoute le contenu), ou l'admin qui le crée.
+        $data['user_id'] = auth()->user()->workspaceId() ?? auth()->id();
         $data['tier'] = $validated['tier'] ?? 'classique';
-        // Un contenu uploadé par un PRODUCTEUR passe en modération (l'assistant/
-        // l'admin le valide et confirme catégorie + tier). Un admin publie direct.
+        // Un contenu ajouté côté PRODUCTEUR passe en modération (son équipe le
+        // valide et confirme le genre ; le tier reste fixé par l'admin). Un
+        // admin publie directement.
         $data['moderation_status'] = auth()->user()->isProducer() ? 'pending' : 'approved';
 
         // Visuels
@@ -231,7 +234,7 @@ class MediaController extends Controller
     protected function authorizeOwnership(Media $medium): void
     {
         $user = auth()->user();
-        if ($user && $user->isProducer() && $medium->user_id !== $user->id) {
+        if ($user && $user->isProducer() && $medium->user_id !== $user->workspaceId()) {
             abort(403, "Ce contenu ne vous appartient pas.");
         }
     }
@@ -245,7 +248,7 @@ class MediaController extends Controller
         $slug = $base;
         $i = 2;
         while (
-            Media::where('slug', $slug)
+            Media::withoutGlobalScope('workspace')->where('slug', $slug)
                 ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
                 ->exists()
         ) {
@@ -361,7 +364,7 @@ class MediaController extends Controller
      */
     protected function isBunnyVideoTaken(string $guid, ?int $ignoreMediaId = null): bool
     {
-        $mediaQuery = Media::where('video_provider', 'bunny')->where('video_id', $guid);
+        $mediaQuery = Media::withoutGlobalScope('workspace')->where('video_provider', 'bunny')->where('video_id', $guid);
         if ($ignoreMediaId) {
             $mediaQuery->where('id', '!=', $ignoreMediaId);
         }

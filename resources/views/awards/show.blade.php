@@ -37,11 +37,11 @@
         </div>
         <div class="flex flex-wrap gap-2">
             <a href="{{ route('awards.edit', $edition) }}" class="inline-flex items-center gap-2 bg-dark-200 hover:bg-dark-300 text-gray-100 px-4 py-2.5 rounded-lg text-sm transition"><i class="fas fa-pen"></i> Paramètres</a>
-            @unless($edition->is_current)
+            @if(! $edition->is_current && auth()->user()->isAdmin())
                 <form action="{{ route('awards.current', $edition) }}" method="POST">@csrf
                     <button class="inline-flex items-center gap-2 bg-primary-500/20 hover:bg-primary-500 text-primary-200 hover:text-white px-4 py-2.5 rounded-lg text-sm transition"><i class="fas fa-mobile-screen"></i> Afficher dans l'app</button>
                 </form>
-            @endunless
+            @endif
             @if($edition->resultsArePublic())
                 <form action="{{ route('awards.unpublish', $edition) }}" method="POST"
                       data-confirm="Retirer le palmarès de l'application ? Les lauréats désignés sont conservés." data-confirm-type="warning" data-confirm-title="Retirer les résultats" data-confirm-confirm="Retirer">

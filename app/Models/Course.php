@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspace;
 use App\Concerns\HasObfuscatedRouteKey;
 use App\Models\Concerns\HasSlug;
 use App\Models\Concerns\HasTranslations;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Course extends Model
 {
-    use HasObfuscatedRouteKey, HasSlug, HasTranslations;
+    use BelongsToWorkspace, HasObfuscatedRouteKey, HasSlug, HasTranslations;
 
     public array $translatable = ['title', 'summary', 'description'];
 

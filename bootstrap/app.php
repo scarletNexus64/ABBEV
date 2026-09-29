@@ -18,9 +18,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // `__()` des validations partiraient dans la langue par défaut.
         $middleware->prependToGroup('api', \App\Http\Middleware\SetLocale::class);
 
+        // Panel web : un producteur (et son équipe) ne voit que son espace.
+        // Doit passer avant SubstituteBindings pour cloisonner aussi les
+        // modèles résolus depuis l'URL.
+        $middleware->appendToGroup('web', \App\Http\Middleware\ScopeToWorkspace::class);
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
+            prepend: \App\Http\Middleware\ScopeToWorkspace::class,
+        );
+
         $middleware->alias([
             'admin'  => \App\Http\Middleware\EnsureIsAdmin::class,
             'role'   => \App\Http\Middleware\EnsureRole::class,
+            'module' => \App\Http\Middleware\EnsureModuleAccess::class,
             'locale' => \App\Http\Middleware\SetLocale::class,
         ]);
     })

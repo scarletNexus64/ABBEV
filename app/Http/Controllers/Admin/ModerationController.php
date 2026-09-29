@@ -11,9 +11,13 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 
 /**
- * Panneau de modération (direction artistique / assistant) : visualise les
- * contenus en attente, les approuve (en confirmant catégorie + tier) ou les
- * rejette avec un motif. Réservé aux rôles admin et assistant.
+ * Panneau de modération : visualise les contenus en attente, les approuve (en
+ * confirmant le genre) ou les rejette avec un motif.
+ *
+ * Un producteur (ou un membre de son équipe ayant le module « moderation »)
+ * ne voit que les contenus de son espace — cloisonnement assuré par le scope
+ * `workspace` de Media, y compris sur {medium}. L'admin voit tout et reste le
+ * seul à fixer le tier, qui détermine la rémunération du producteur.
  */
 class ModerationController extends Controller
 {
@@ -116,14 +120,17 @@ class ModerationController extends Controller
 
     public function approve(Request $request, Media $medium)
     {
-        $data = $request->validate([
+        $isAdmin = $request->user()->isAdmin();
+
+        $data = $request->validate(array_filter([
             'category_id' => 'required|exists:categories,id',
-            'tier' => 'required|in:classique,standard,premium',
-        ]);
+            // Le producteur ne fixe pas sa propre rémunération : champ ignoré.
+            'tier' => $isAdmin ? 'required|in:classique,standard,premium' : null,
+        ]));
 
         $medium->update([
             'category_id' => $data['category_id'],
-            'tier' => $data['tier'],
+            'tier' => $isAdmin ? $data['tier'] : $medium->tier,
             'moderation_status' => 'approved',
             'rejection_reason' => null,
             'reviewed_by' => auth()->id(),

@@ -10,6 +10,7 @@ use App\Models\Country;
 use App\Models\Media;
 use App\Models\Talent;
 use App\Models\TalentCredit;
+use App\Rules\InWorkspace;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -145,7 +146,7 @@ class TalentController extends Controller
             'languages' => 'nullable|string|max:300',
             'skills' => 'nullable|string|max:500',
             'showreel_url' => 'nullable|url|max:500',
-            'agent_id' => 'nullable|integer|exists:agents,id',
+            'agent_id' => ['nullable', 'integer', new InWorkspace(Agent::class)],
             'photo' => 'nullable|image|max:4096',
             'is_published' => 'required|boolean',
             'is_featured' => 'required|boolean',
@@ -153,7 +154,7 @@ class TalentController extends Controller
             'credits.*.title' => 'nullable|string|max:190',
             'credits.*.year' => 'nullable|integer|min:1900|max:' . (now()->year + 5),
             'credits.*.role' => 'nullable|string|max:190',
-            'credits.*.media_id' => 'nullable|integer|exists:media,id',
+            'credits.*.media_id' => ['nullable', 'integer', new InWorkspace(Media::class)],
         ] + $this->translationRules(self::TRANSLATABLE));
     }
 

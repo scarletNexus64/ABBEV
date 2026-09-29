@@ -2,12 +2,20 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspaceThrough;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** Candidature à un appel à écriture ou à musique. */
 class ProjectSubmission extends Model
 {
+    use BelongsToWorkspaceThrough;
+
+    public static function workspaceParent(): string
+    {
+        return 'call';
+    }
+
     public const STATUSES = [
         'received' => 'Reçue',
         'shortlisted' => 'Présélectionnée',

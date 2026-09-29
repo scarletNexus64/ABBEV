@@ -10,6 +10,7 @@ use App\Models\AwardEdition;
 use App\Models\AwardNominee;
 use App\Models\Media;
 use App\Models\Talent;
+use App\Rules\InWorkspace;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -65,8 +66,8 @@ class AwardCategoryController extends Controller
     {
         $data = $request->validate([
             'source' => ['required', Rule::in(['talent', 'media', 'free'])],
-            'talent_id' => 'nullable|required_if:source,talent|integer|exists:talents,id',
-            'media_id' => 'nullable|required_if:source,media|integer|exists:media,id',
+            'talent_id' => ['nullable', 'required_if:source,talent', 'integer', new InWorkspace(Talent::class)],
+            'media_id' => ['nullable', 'required_if:source,media', 'integer', new InWorkspace(Media::class)],
             'name' => 'nullable|required_if:source,free|string|max:160',
             'subtitle' => 'nullable|string|max:190',
             'photo' => 'nullable|image|max:4096',

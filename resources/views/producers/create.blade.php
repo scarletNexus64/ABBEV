@@ -35,6 +35,19 @@
             </p>
         </div>
 
+        <div class="mb-6 bg-dark-50 border border-dark-200 rounded-lg p-4">
+            <p class="text-sm font-medium text-gray-200 mb-3"><i class="fas fa-layer-group text-primary-400 mr-2"></i>Son espace comprend tous les modules</p>
+            <div class="grid sm:grid-cols-2 gap-x-4 gap-y-2">
+                @foreach(\App\Models\User::MODULES as $module)
+                    <p class="text-sm text-gray-400"><i class="fas fa-{{ $module['icon'] }} w-4 text-center text-primary-400 mr-2"></i>{{ $module['label'] }}</p>
+                @endforeach
+            </div>
+            <p class="text-xs text-gray-500 mt-3">
+                Il ne voit que ses propres données, invite lui-même son équipe et attribue à chaque membre les modules qu'il peut gérer.
+                Le tier (rémunération) de ses contenus reste fixé par l'administration.
+            </p>
+        </div>
+
         <div class="mb-8 bg-primary-500/10 border border-primary-500/30 rounded-lg p-4">
             <div class="flex items-start gap-3">
                 <i class="fas fa-key text-primary-400 text-xl mt-1"></i>

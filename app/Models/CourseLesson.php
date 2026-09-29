@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspaceThrough;
 use App\Concerns\HasObfuscatedRouteKey;
 use App\Models\Concerns\HasTranslations;
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +16,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class CourseLesson extends Model
 {
-    use HasObfuscatedRouteKey, HasTranslations;
+    use BelongsToWorkspaceThrough, HasObfuscatedRouteKey, HasTranslations;
+
+    public static function workspaceParent(): string
+    {
+        return 'course';
+    }
 
     public array $translatable = ['title', 'summary'];
 

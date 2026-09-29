@@ -76,8 +76,9 @@ class DashboardController extends Controller
         // Recent media (cloisonné)
         $recentMedia = $media()->with('category')->latest()->take(10)->get();
 
-        // Gains du producteur (vues générées × tarif du tier).
-        $earnings = $isProducer
+        // Gains du producteur (vues générées × tarif du tier) : visibles par le
+        // titulaire de l'espace uniquement, pas par son équipe.
+        $earnings = $user->isProducerOwner()
             ? app(\App\Services\ProducerRevenueService::class)->earningsForProducer($user)
             : null;
 

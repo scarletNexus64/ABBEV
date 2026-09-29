@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspace;
 use App\Concerns\HasObfuscatedRouteKey;
 use App\Models\Concerns\HasSlug;
 use App\Models\Concerns\HasTranslations;
@@ -23,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Talent extends Model
 {
-    use HasObfuscatedRouteKey, HasSlug, HasTranslations;
+    use BelongsToWorkspace, HasObfuscatedRouteKey, HasSlug, HasTranslations;
 
     /** Explicite : l'inflecteur anglais tient « talent » pour indénombrable. */
     protected $table = 'talents';

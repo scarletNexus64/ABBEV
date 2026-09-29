@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspace;
 use App\Casts\BusinessDateTime;
 use App\Concerns\HasObfuscatedRouteKey;
 use App\Models\Concerns\HasSlug;
@@ -21,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class CastingCall extends Model
 {
-    use HasObfuscatedRouteKey, HasSlug, HasTranslations;
+    use BelongsToWorkspace, HasObfuscatedRouteKey, HasSlug, HasTranslations;
 
     public array $translatable = ['description'];
 

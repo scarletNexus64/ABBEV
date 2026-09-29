@@ -93,7 +93,7 @@ class BunnySyncController extends Controller
         $user     = $request->user();
         $producer = $user && $user->isProducer();
         $ownGuids = $producer
-            ? BunnyUpload::where('user_id', $user->id)->whereNotNull('bunny_guid')->pluck('bunny_guid')->all()
+            ? BunnyUpload::where('user_id', $user->workspaceId())->whereNotNull('bunny_guid')->pluck('bunny_guid')->all()
             : null; // null = aucune restriction (admin)
 
         // 1. Vidéos Bunny (best-effort : si Bunny échoue, on garde les vidéos locales).
@@ -145,7 +145,7 @@ class BunnySyncController extends Controller
         }
 
         // 2. Vidéos locales publiées (non encore attribuées), cloisonnées au producteur.
-        $localItems = $this->availableLocalVideos($usageMap, $q, $includeGuid, $producer ? $user->id : null);
+        $localItems = $this->availableLocalVideos($usageMap, $q, $includeGuid, $producer ? $user->workspaceId() : null);
 
         $items = $localItems->concat($bunnyItems)->values();
 
@@ -183,7 +183,7 @@ class BunnySyncController extends Controller
     protected function availableLocalVideos(array $usageMap, string $q, ?string $includeGuid, ?int $ownerId = null): \Illuminate\Support\Collection
     {
         // Chemins locaux déjà attribués à un film ou un épisode.
-        $takenPaths = Media::query()->where('video_provider', 'local')->whereNotNull('video_path')->pluck('video_path')
+        $takenPaths = Media::withoutGlobalScope('workspace')->where('video_provider', 'local')->whereNotNull('video_path')->pluck('video_path')
             ->concat(Episode::query()->where('video_provider', 'local')->whereNotNull('video_path')->pluck('video_path'))
             ->filter()->unique()->all();
 
@@ -224,7 +224,7 @@ class BunnySyncController extends Controller
     {
         $map = [];
 
-        Media::query()
+        Media::withoutGlobalScope('workspace')
             ->where('video_provider', 'bunny')
             ->whereNotNull('video_id')
             ->get(['id', 'title', 'slug', 'type', 'video_id'])

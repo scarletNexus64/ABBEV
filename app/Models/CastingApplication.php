@@ -2,12 +2,20 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspaceThrough;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** Candidature d'un utilisateur de l'app à un rôle d'une annonce. */
 class CastingApplication extends Model
 {
+    use BelongsToWorkspaceThrough;
+
+    public static function workspaceParent(): string
+    {
+        return 'call';
+    }
+
     public const STATUSES = [
         'pending' => 'Reçue',
         'shortlisted' => 'Présélectionnée',

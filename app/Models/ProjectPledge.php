@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspaceThrough;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -15,6 +16,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class ProjectPledge extends Model
 {
+    use BelongsToWorkspaceThrough;
+
+    public static function workspaceParent(): string
+    {
+        return 'call';
+    }
+
     public const STATUSES = [
         'pending' => 'À confirmer',
         'confirmed' => 'Confirmée',

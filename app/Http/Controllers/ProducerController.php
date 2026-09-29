@@ -16,14 +16,18 @@ use Illuminate\Support\Str;
  * À la création, un mot de passe fort est généré automatiquement puis ENVOYÉ
  * PAR EMAIL au producteur (il n'est jamais stocké en clair). Si l'envoi échoue,
  * on retombe sur l'affichage unique à l'admin pour qu'il le transmette à la main.
- * Le producteur se connecte ensuite sur /admin/login et n'accède qu'à son espace.
+ * Le producteur se connecte ensuite sur /admin/login et gère tout son espace :
+ * contenus + upload, œuvres, modération, audience, talents & casting, Awards,
+ * formation, appels à projets, billetterie. Il y invite lui-même son équipe
+ * (TeamController) ; les membres d'équipe n'apparaissent pas dans cette liste.
  */
 class ProducerController extends Controller
 {
     public function index()
     {
         $producers = User::where('role', 'producer')
-            ->withCount('media')
+            ->whereNull('producer_id')
+            ->withCount(['media', 'teamMembers'])
             ->latest()
             ->paginate(20);
 
@@ -38,12 +42,13 @@ class ProducerController extends Controller
     /** Fiche détaillée d'un producteur : ses contenus (films/séries) + actions. */
     public function show(User $user)
     {
-        if ($user->role !== 'producer') {
+        if (! $user->isProducerOwner()) {
             return redirect()->route('producers.index')
                 ->with('error', "Cet utilisateur n'est pas un producteur.");
         }
 
         $media = $user->media()->with('category')->latest()->get();
+        $team = $user->teamMembers()->orderBy('name')->get();
 
         $stats = [
             'total'  => $media->count(),
@@ -52,7 +57,7 @@ class ProducerController extends Controller
             'views'  => (int) $media->sum('views_count'),
         ];
 
-        return view('producers.show', compact('user', 'media', 'stats'));
+        return view('producers.show', compact('user', 'media', 'stats', 'team'));
     }
 
     public function store(Request $request)
@@ -82,7 +87,7 @@ class ProducerController extends Controller
      */
     public function resend(User $user)
     {
-        if ($user->role !== 'producer') {
+        if (! $user->isProducerOwner()) {
             return back()->with('error', "Cet utilisateur n'est pas un producteur.");
         }
 
@@ -94,14 +99,16 @@ class ProducerController extends Controller
 
     public function destroy(User $user)
     {
-        if ($user->role !== 'producer') {
+        if (! $user->isProducerOwner()) {
             return back()->with('error', "Cet utilisateur n'est pas un producteur.");
         }
 
-        $user->delete(); // les contenus du producteur passent user_id = null (nullOnDelete)
+        // Contenus et modules passent à la plateforme (nullOnDelete) ; l'équipe
+        // perd l'accès au panel (User::booted).
+        $user->delete();
 
         return redirect()->route('producers.index')
-            ->with('success', 'Producteur supprimé. Ses contenus restent dans le catalogue (sans propriétaire).');
+            ->with('success', 'Producteur supprimé. Ses contenus et modules restent sur la plateforme (gérés par l\'admin) et son équipe n\'a plus accès au panel.');
     }
 
     /**

@@ -15,7 +15,7 @@ class ProducerEarningsController extends Controller
 {
     public function index(ProducerRevenueService $revenue)
     {
-        $producers = User::where('role', 'producer')->orderBy('name')->get();
+        $producers = User::where('role', 'producer')->whereNull('producer_id')->orderBy('name')->get();
 
         $rows = $producers->map(function (User $p) use ($revenue) {
             $e = $revenue->earningsForProducer($p);

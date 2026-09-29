@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspace;
 use App\Concerns\HasObfuscatedRouteKey;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +13,13 @@ use App\Models\Concerns\HasTranslations;
 
 class Media extends Model
 {
-    use HasTranslations;
+    use BelongsToWorkspace, HasTranslations;
+
+    /** Les contenus appartiennent à leur producteur via `user_id`. */
+    public static function workspaceColumn(): string
+    {
+        return 'user_id';
+    }
 
     /** Champs exposés à l'app et traduits via la table `translations`. */
     public array $translatable = ['title', 'description'];
@@ -87,7 +94,7 @@ class Media extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    /** Membre du panel ayant validé/rejeté le contenu (assistant/admin). */
+    /** Membre du panel ayant validé/rejeté le contenu (producteur, équipe ou admin). */
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
@@ -95,15 +102,16 @@ class Media extends Model
 
     /**
      * Restreint la requête aux contenus visibles par un utilisateur du panel :
-     * un producteur ne voit que SES contenus ; admin/assistant voient tout.
+     * un producteur (et son équipe) ne voit que les contenus de son espace ;
+     * l'admin voit tout.
      */
     public function scopeVisibleTo(Builder $query, ?User $user): Builder
     {
         if ($user && $user->isProducer()) {
-            return $query->where('user_id', $user->id);
+            return $query->where('user_id', $user->workspaceId());
         }
 
-        return $query; // admin/assistant (ou contexte non restreint) : tout
+        return $query; // admin (ou contexte non restreint) : tout
     }
 
     /** Contenus approuvés par la modération (visibles au catalogue public). */

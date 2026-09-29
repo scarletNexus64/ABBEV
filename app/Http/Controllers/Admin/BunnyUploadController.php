@@ -85,7 +85,7 @@ class BunnyUploadController extends Controller
         $query = BunnyUpload::query();
         $user  = auth()->user();
         if ($user && $user->isProducer()) {
-            $query->where('user_id', $user->id);
+            $query->where('user_id', $user->workspaceId());
         }
 
         return $query;
@@ -95,7 +95,7 @@ class BunnyUploadController extends Controller
     private function authorizeUploadOwnership(BunnyUpload $upload): void
     {
         $user = auth()->user();
-        if ($user && $user->isProducer() && $upload->user_id !== $user->id) {
+        if ($user && $user->isProducer() && $upload->user_id !== $user->workspaceId()) {
             abort(403, "Cet upload ne vous appartient pas.");
         }
     }
@@ -142,7 +142,8 @@ class BunnyUploadController extends Controller
             : pathinfo($data['filename'], PATHINFO_FILENAME);
 
         $upload = BunnyUpload::create([
-            'user_id'              => Auth::id(),
+            // Upload partagé par toute l'équipe du producteur.
+            'user_id'              => Auth::user()->workspaceId() ?? Auth::id(),
             'original_filename'    => $data['filename'],
             'title'                => $title,
             'size_bytes'           => $data['size'],

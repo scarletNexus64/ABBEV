@@ -65,8 +65,8 @@ class ProducerRevenueService
         }
         $tier = $plan->tier ?: 'classique';
 
-        // Films approuvés du tier → +1.
-        $movies = Media::query()->approved()
+        // Films approuvés du tier → +1 (tous producteurs : jamais cloisonné).
+        $movies = Media::withoutGlobalScope('workspace')->approved()
             ->where('type', 'movie')
             ->where('tier', $tier)
             ->increment('producer_views');

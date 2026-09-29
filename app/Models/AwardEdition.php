@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspace;
 use App\Casts\BusinessDateTime;
 use App\Concerns\HasObfuscatedRouteKey;
 use App\Models\Concerns\HasSlug;
@@ -20,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
  */
 class AwardEdition extends Model
 {
-    use HasObfuscatedRouteKey, HasSlug, HasTranslations;
+    use BelongsToWorkspace, HasObfuscatedRouteKey, HasSlug, HasTranslations;
 
     public array $translatable = ['tagline', 'description'];
 
@@ -104,7 +105,9 @@ class AwardEdition extends Model
     /** Marque cette édition comme celle de l'app, et elle seule. */
     public function makeCurrent(): void
     {
-        static::query()->whereKeyNot($this->id)->update(['is_current' => false]);
+        // Une seule édition affichée dans l'app, tous producteurs confondus.
+        static::query()->withoutGlobalScope('workspace')
+            ->whereKeyNot($this->id)->update(['is_current' => false]);
         $this->forceFill(['is_current' => true])->save();
     }
 }

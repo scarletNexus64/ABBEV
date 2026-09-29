@@ -62,7 +62,10 @@ class AwardEditionController extends Controller
             if ($request->boolean('apply_template', true)) {
                 AwardCatalog::applyTo($edition);
             }
-            if ($request->boolean('is_current') || ! AwardEdition::where('is_current', true)->exists()) {
+            // L'édition affichée dans l'app est unique sur la plateforme : seul
+            // l'admin la choisit (un producteur ne remplace pas celle d'un autre).
+            if ($request->user()->isAdmin()
+                && ($request->boolean('is_current') || ! AwardEdition::where('is_current', true)->exists())) {
                 $edition->makeCurrent();
             }
 
@@ -108,7 +111,7 @@ class AwardEditionController extends Controller
 
         $edition->update($this->attributes($request, $data, $edition));
         $this->saveEnglish($edition, $request, self::TRANSLATABLE);
-        if ($request->boolean('is_current')) {
+        if ($request->user()->isAdmin() && $request->boolean('is_current')) {
             $edition->makeCurrent();
         }
 

@@ -75,8 +75,8 @@
             </div>
         </div>
     </div>
-    @else
-    <!-- Upload shortcut (producteur) -->
+    @elseif(auth()->user()->canAccessModule('contents'))
+    <!-- Upload shortcut (producteur, ou membre ayant le module contenus) -->
     <a href="{{ route('admin.bunny.uploads.index') }}" class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 p-6 hover:shadow-2xl hover:shadow-primary-500/10 transition-all duration-300 transform hover:-translate-y-1 flex items-center justify-between">
         <div class="flex-1">
             <p class="text-sm font-medium text-gray-400 mb-1">Mes vidéos</p>

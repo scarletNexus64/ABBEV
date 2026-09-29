@@ -50,7 +50,7 @@
                 <i class="fas fa-clapperboard text-primary-400"></i> Producteurs
             </h2>
             <p class="text-gray-400 text-sm mt-1">
-                {{ $producers->total() }} producteur(s). Chacun ne voit que ses propres films, séries et uploads.
+                {{ $producers->total() }} producteur(s). Chacun gère son propre espace (contenus, modules, équipe) et ne voit que ses données.
             </p>
         </div>
         <a href="{{ route('producers.create') }}"
@@ -68,6 +68,7 @@
                         <th class="text-left px-6 py-3">Producteur</th>
                         <th class="text-left px-6 py-3">Email</th>
                         <th class="text-left px-6 py-3">Contenus</th>
+                        <th class="text-left px-6 py-3">Équipe</th>
                         <th class="text-left px-6 py-3">Créé</th>
                         <th class="text-right px-6 py-3">Actions</th>
                     </tr>
@@ -85,6 +86,7 @@
                             </td>
                             <td class="px-6 py-3 text-gray-300 font-mono">{{ $producer->email }}</td>
                             <td class="px-6 py-3 text-gray-400">{{ $producer->media_count }}</td>
+                            <td class="px-6 py-3 text-gray-400">{{ $producer->team_members_count }}</td>
                             <td class="px-6 py-3 text-gray-500">{{ $producer->created_at?->diffForHumans() }}</td>
                             <td class="px-6 py-3 text-right">
                                 <div class="inline-flex items-center gap-2">
@@ -101,7 +103,7 @@
                                         </button>
                                     </form>
                                     <form action="{{ route('producers.destroy', $producer) }}" method="POST" class="inline"
-                                          data-confirm="Supprimer ce producteur ? Ses contenus restent dans le catalogue, sans propriétaire."
+                                          data-confirm="Supprimer ce producteur ? Ses contenus et modules restent sur la plateforme, gérés par l'admin, et son équipe perd l'accès au panel."
                                           data-confirm-type="danger" data-confirm-title="Supprimer le producteur" data-confirm-confirm="Supprimer">
                                         @csrf @method('DELETE')
                                         <button type="submit" class="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-dark-200 hover:bg-red-500/30 text-red-300" title="Supprimer">
@@ -112,7 +114,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="px-6 py-10 text-center text-gray-500">
+                        <tr><td colspan="6" class="px-6 py-10 text-center text-gray-500">
                             <i class="fas fa-clapperboard text-3xl mb-2 block opacity-50"></i>
                             Aucun producteur. Cliquez sur « Ajouter un producteur ».
                         </td></tr>

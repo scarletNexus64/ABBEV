@@ -6,6 +6,7 @@ use App\Models\Country;
 use App\Models\Media;
 use App\Models\Screening;
 use App\Models\TicketType;
+use App\Rules\InWorkspace;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -198,7 +199,7 @@ class ScreeningController extends Controller
     private function validateScreening(Request $request): array
     {
         return $request->validate([
-            'media_id'              => 'nullable|exists:media,id',
+            'media_id'              => ['nullable', new InWorkspace(Media::class)],
             'movie_title'           => 'nullable|string|max:255',
             'cinema_name'           => 'required|string|max:255',
             'location'              => 'required|string|max:255',

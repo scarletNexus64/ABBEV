@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspaceThrough;
 use App\Concerns\HasObfuscatedRouteKey;
 use App\Models\Concerns\HasTranslations;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /** Prix d'une édition (« Meilleure actrice — Cinéma »…). */
 class AwardCategory extends Model
 {
-    use HasObfuscatedRouteKey, HasTranslations;
+    use BelongsToWorkspaceThrough, HasObfuscatedRouteKey, HasTranslations;
+
+    public static function workspaceParent(): string
+    {
+        return 'edition';
+    }
 
     public array $translatable = ['name', 'description'];
 

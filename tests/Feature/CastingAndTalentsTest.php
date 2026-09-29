@@ -180,10 +180,18 @@ class CastingAndTalentsTest extends TestCase
         $this->assertSame(1, $talent->credits()->count());
     }
 
-    public function test_les_pages_talents_sont_reservees_aux_admins(): void
+    public function test_les_pages_talents_sont_reservees_au_panel_et_au_module(): void
     {
-        $this->actingAs(User::factory()->create(['role' => 'producer']))
+        $this->actingAs(User::factory()->create(['role' => 'user']))
             ->get('/admin/talents')
             ->assertForbidden();
+
+        $producer = User::factory()->create(['role' => 'producer']);
+        $this->actingAs($producer)->get('/admin/talents')->assertOk();
+
+        // Membre d'équipe sans le module « talents » : refusé.
+        $member = User::factory()->create(['role' => 'producer']);
+        $member->forceFill(['producer_id' => $producer->id, 'permissions' => ['contents']])->save();
+        $this->actingAs($member)->get('/admin/talents')->assertForbidden();
     }
 }

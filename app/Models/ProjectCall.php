@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspace;
 use App\Casts\BusinessDateTime;
 use App\Concerns\HasObfuscatedRouteKey;
 use App\Models\Concerns\HasSlug;
@@ -21,7 +22,7 @@ use Illuminate\Support\Str;
  */
 class ProjectCall extends Model
 {
-    use HasObfuscatedRouteKey, HasSlug, HasTranslations;
+    use BelongsToWorkspace, HasObfuscatedRouteKey, HasSlug, HasTranslations;
 
     public array $translatable = ['title', 'summary', 'description', 'requirements'];
 

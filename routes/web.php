@@ -48,7 +48,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     Route::get('/reset-password/{token}', [App\Http\Controllers\Admin\PasswordResetController::class, 'showReset'])->name('password.reset');
     Route::post('/reset-password', [App\Http\Controllers\Admin\PasswordResetController::class, 'reset'])->name('password.update');
 
-    Route::middleware(['auth', 'role:admin,producer,assistant'])->group(function () {
+    Route::middleware(['auth', 'role:admin,producer'])->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     });
@@ -56,23 +56,43 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| Espace MODÉRATION (admin + assistant) — validation des contenus
+| Espace PRODUCTEUR — chaque module est cloisonné à l'espace du producteur
+| (ScopeToWorkspace) et ouvert à son équipe module par module (`module:`).
+| L'admin a accès à tout, tous espaces confondus.
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth', 'role:admin,assistant'])->group(function () {
+
+// Modération des contenus de l'espace
+Route::middleware(['auth', 'role:admin,producer', 'module:moderation'])->group(function () {
     Route::get('/moderation', [App\Http\Controllers\Admin\ModerationController::class, 'index'])->name('moderation.index');
     Route::get('/moderation/{medium}', [App\Http\Controllers\Admin\ModerationController::class, 'show'])->name('moderation.show');
     Route::post('/moderation/{medium}/approve', [App\Http\Controllers\Admin\ModerationController::class, 'approve'])->name('moderation.approve');
     Route::post('/moderation/{medium}/reject', [App\Http\Controllers\Admin\ModerationController::class, 'reject'])->name('moderation.reject');
 });
 
-/*
-|--------------------------------------------------------------------------
-| Espace STAFF (admin + producteur) — contenus + upload (données cloisonnées)
-|--------------------------------------------------------------------------
-*/
-Route::middleware(['auth', 'role:admin,producer'])->group(function () {
+// Audience : qui a regardé les contenus de l'espace
+Route::middleware(['auth', 'role:admin,producer', 'module:audience'])->group(function () {
+    Route::get('/audience', [App\Http\Controllers\Admin\AudienceController::class, 'index'])->name('audience.index');
+});
+
+// Équipe du producteur (réservée au producteur titulaire de l'espace)
+Route::middleware(['auth', 'role:producer'])->prefix('admin/team')->name('team.')->group(function () {
+    Route::get('/', [App\Http\Controllers\Admin\TeamController::class, 'index'])->name('index');
+    Route::get('/create', [App\Http\Controllers\Admin\TeamController::class, 'create'])->name('create');
+    Route::post('/', [App\Http\Controllers\Admin\TeamController::class, 'store'])->name('store');
+    Route::get('/{member}/edit', [App\Http\Controllers\Admin\TeamController::class, 'edit'])->name('edit');
+    Route::put('/{member}', [App\Http\Controllers\Admin\TeamController::class, 'update'])->name('update');
+    Route::post('/{member}/resend', [App\Http\Controllers\Admin\TeamController::class, 'resend'])->name('resend');
+    Route::delete('/{member}', [App\Http\Controllers\Admin\TeamController::class, 'destroy'])->name('destroy');
+});
+
+// Œuvres adaptables
+Route::middleware(['auth', 'role:admin,producer', 'module:oeuvres'])->group(function () {
     Route::resource('oeuvres', OeuvreController::class);
+});
+
+// Films, séries, épisodes et upload vidéos
+Route::middleware(['auth', 'role:admin,producer', 'module:contents'])->group(function () {
     Route::resource('media', MediaController::class);
 
     // Episodes Management for Series
@@ -122,10 +142,6 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     // Genres (cat.md : 15 genres) — noms de routes `categories.*` conservés.
     Route::resource('categories', CategoryController::class)->except(['show']);
     Route::post('categories/reorder', [CategoryController::class, 'reorder'])->name('categories.reorder');
-    // Annulation d'une séance (statut → canceled). Route hors resource.
-    Route::post('screenings/{screening}/cancel', [ScreeningController::class, 'cancel'])
-        ->name('screenings.cancel');
-    Route::resource('screenings', ScreeningController::class);
     Route::get('/settings', [App\Http\Controllers\SettingController::class, 'index'])->name('settings.index');
 });
 
@@ -157,15 +173,12 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     Route::post('/producers/{user}/resend', [ProducerController::class, 'resend'])->name('producers.resend');
     Route::delete('/producers/{user}', [ProducerController::class, 'destroy'])->name('producers.destroy');
 
+    // Transfert de données (plateforme ou producteur → producteur)
+    Route::get('/transfers', [App\Http\Controllers\Admin\DataTransferController::class, 'index'])->name('transfers.index');
+    Route::post('/transfers', [App\Http\Controllers\Admin\DataTransferController::class, 'store'])->name('transfers.store');
+
     // Revenus producteurs (comptes dus + simulation des tarifs)
     Route::get('/earnings', [App\Http\Controllers\ProducerEarningsController::class, 'index'])->name('earnings.index');
-
-    // Assistants (direction artistique — modération des contenus)
-    Route::get('/assistants', [App\Http\Controllers\AssistantController::class, 'index'])->name('assistants.index');
-    Route::get('/assistants/create', [App\Http\Controllers\AssistantController::class, 'create'])->name('assistants.create');
-    Route::post('/assistants', [App\Http\Controllers\AssistantController::class, 'store'])->name('assistants.store');
-    Route::post('/assistants/{user}/resend', [App\Http\Controllers\AssistantController::class, 'resend'])->name('assistants.resend');
-    Route::delete('/assistants/{user}', [App\Http\Controllers\AssistantController::class, 'destroy'])->name('assistants.destroy');
 
     Route::resource('subscription-plans', App\Http\Controllers\SubscriptionPlanController::class);
     Route::get('/transactions', [App\Http\Controllers\TransactionController::class, 'index'])->name('transactions.index');
@@ -187,8 +200,7 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| Modules cat.md (admin) — talents & casting, Lions Head Awards, cours,
-| appels à projets, sélections éditoriales, contrôle des billets
+| Sélections éditoriales (admin) — vitrine de l'app, tous producteurs
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
@@ -202,6 +214,17 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     Route::post('/rubriques/{rubrique}/media/{media}/move', [App\Http\Controllers\Admin\RubriqueController::class, 'move'])->name('rubriques.media.move');
     Route::post('/media/{media}/featured', [App\Http\Controllers\Admin\RubriqueController::class, 'toggleFeatured'])->name('rubriques.featured.toggle');
 
+    // Édition des Awards affichée dans l'app : une seule, tous producteurs confondus
+    Route::post('/awards/{edition}/current', [App\Http\Controllers\Admin\AwardEditionController::class, 'makeCurrent'])->name('awards.current');
+});
+
+/*
+|--------------------------------------------------------------------------
+| Modules cat.md (espace producteur) — talents & casting, Lions Head Awards,
+| cours, appels à projets, billetterie et contrôle des billets
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'role:admin,producer', 'module:talents'])->prefix('admin')->group(function () {
     // Talents & agents
     Route::resource('talents', App\Http\Controllers\Admin\TalentController::class)->except(['show']);
     Route::resource('agents', App\Http\Controllers\Admin\AgentController::class)->except(['show']);
@@ -215,13 +238,13 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
         ->name('castings.applications.photo');
     Route::get('/castings/{casting}/export', [App\Http\Controllers\Admin\CastingCallController::class, 'export'])
         ->name('castings.export');
+});
 
-    // Lions Head Awards
+Route::middleware(['auth', 'role:admin,producer', 'module:awards'])->prefix('admin')->group(function () {
     Route::resource('awards', App\Http\Controllers\Admin\AwardEditionController::class)
         ->parameters(['awards' => 'edition']);
     Route::post('/awards/{edition}/publish', [App\Http\Controllers\Admin\AwardEditionController::class, 'publish'])->name('awards.publish');
     Route::post('/awards/{edition}/unpublish', [App\Http\Controllers\Admin\AwardEditionController::class, 'unpublish'])->name('awards.unpublish');
-    Route::post('/awards/{edition}/current', [App\Http\Controllers\Admin\AwardEditionController::class, 'makeCurrent'])->name('awards.current');
     Route::post('/awards/{edition}/template', [App\Http\Controllers\Admin\AwardEditionController::class, 'applyTemplate'])->name('awards.template');
     Route::post('/awards/{edition}/categories', [App\Http\Controllers\Admin\AwardCategoryController::class, 'store'])->name('awards.categories.store');
     Route::put('/award-categories/{category}', [App\Http\Controllers\Admin\AwardCategoryController::class, 'update'])->name('awards.categories.update');
@@ -229,16 +252,19 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     Route::post('/award-categories/{category}/nominees', [App\Http\Controllers\Admin\AwardCategoryController::class, 'storeNominee'])->name('awards.nominees.store');
     Route::delete('/award-nominees/{nominee}', [App\Http\Controllers\Admin\AwardCategoryController::class, 'destroyNominee'])->name('awards.nominees.destroy');
     Route::post('/award-nominees/{nominee}/winner', [App\Http\Controllers\Admin\AwardCategoryController::class, 'toggleWinner'])->name('awards.nominees.winner');
+});
 
-    // Cours de cinéma
+Route::middleware(['auth', 'role:admin,producer', 'module:courses'])->prefix('admin')->group(function () {
     Route::resource('courses', App\Http\Controllers\Admin\CourseController::class)->except(['show']);
     Route::post('/courses/{course}/lessons', [App\Http\Controllers\Admin\CourseController::class, 'storeLesson'])->name('courses.lessons.store');
     Route::put('/course-lessons/{lesson}', [App\Http\Controllers\Admin\CourseController::class, 'updateLesson'])->name('courses.lessons.update');
     Route::delete('/course-lessons/{lesson}', [App\Http\Controllers\Admin\CourseController::class, 'destroyLesson'])->name('courses.lessons.destroy');
     Route::post('/course-lessons/{lesson}/move', [App\Http\Controllers\Admin\CourseController::class, 'moveLesson'])->name('courses.lessons.move');
     Route::get('/course-lessons/{lesson}/file', [App\Http\Controllers\Admin\CourseController::class, 'lessonFile'])->name('courses.lessons.file');
+});
 
-    // Appels à projets (financement, écriture, musique)
+Route::middleware(['auth', 'role:admin,producer', 'module:calls'])->prefix('admin')->group(function () {
+    // Financement, écriture, musique
     Route::resource('calls', App\Http\Controllers\Admin\ProjectCallController::class);
     Route::patch('/calls/{call}/submissions/{submission}', [App\Http\Controllers\Admin\ProjectCallController::class, 'reviewSubmission'])
         ->name('calls.submissions.review');
@@ -248,8 +274,17 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
         ->name('calls.pledges.review');
     Route::get('/calls/{call}/export', [App\Http\Controllers\Admin\ProjectCallController::class, 'export'])
         ->name('calls.export');
+});
 
-    // Contrôle des billets et codes cinéma
+// Séances & codes cinéma (URLs historiques hors /admin conservées)
+Route::middleware(['auth', 'role:admin,producer', 'module:ticketing'])->group(function () {
+    // Annulation d'une séance (statut → canceled). Route hors resource.
+    Route::post('screenings/{screening}/cancel', [ScreeningController::class, 'cancel'])
+        ->name('screenings.cancel');
+    Route::resource('screenings', ScreeningController::class);
+});
+
+Route::middleware(['auth', 'role:admin,producer', 'module:tickets'])->prefix('admin')->group(function () {
     Route::get('/tickets/check', [App\Http\Controllers\Admin\TicketCheckController::class, 'index'])->name('tickets.check');
     Route::post('/tickets/{reservation}/redeem', [App\Http\Controllers\Admin\TicketCheckController::class, 'redeem'])->name('tickets.redeem');
 });

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,7 +14,7 @@ use App\Models\Concerns\HasTranslations;
  */
 class Oeuvre extends Model
 {
-    use HasTranslations;
+    use BelongsToWorkspace, HasTranslations;
 
     /** Champs exposés à l'app et traduits via la table `translations`. */
     public array $translatable = ['title', 'description'];

@@ -11,6 +11,10 @@
     </a>
 
     <div class="flex flex-wrap items-center gap-2">
+        <a href="{{ route('transfers.index', ['target' => $user->getRouteKey()]) }}"
+           class="bg-primary-500/20 hover:bg-primary-500 text-primary-300 hover:text-white px-4 py-2 rounded-lg text-sm transition">
+            <i class="fas fa-right-left mr-1"></i> Lui transférer des données
+        </a>
         <form action="{{ route('producers.resend', $user) }}" method="POST" class="inline"
               data-confirm="Régénérer un nouveau mot de passe et l'envoyer par email à {{ $user->email }} ? L'ancien sera invalidé."
               data-confirm-type="primary" data-confirm-confirm="Renvoyer">
@@ -20,7 +24,7 @@
             </button>
         </form>
         <form action="{{ route('producers.destroy', $user) }}" method="POST" class="inline"
-              data-confirm="Supprimer ce producteur ? Ses contenus restent dans le catalogue, sans propriétaire."
+              data-confirm="Supprimer ce producteur ? Ses contenus et modules restent sur la plateforme, gérés par l'admin, et son équipe perd l'accès au panel."
               data-confirm-type="danger" data-confirm-title="Supprimer le producteur" data-confirm-confirm="Supprimer">
             @csrf @method('DELETE')
             <button type="submit" class="bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white px-4 py-2 rounded-lg text-sm transition">
@@ -130,5 +134,31 @@
             </tbody>
         </table>
     </div>
+</div>
+<!-- Équipe -->
+<div class="bg-dark-100 rounded-xl shadow-lg border border-dark-200 overflow-hidden mt-6">
+    <div class="p-6 border-b border-dark-200 flex items-center justify-between">
+        <h3 class="text-xl font-bold text-white">
+            <i class="fas fa-people-group text-primary-400 mr-2"></i> Équipe
+        </h3>
+        <span class="text-gray-400 text-sm">{{ $team->count() }} membre(s) · gérée par le producteur</span>
+    </div>
+    @forelse($team as $member)
+        <div class="px-6 py-4 border-b border-dark-200/70 last:border-0 flex flex-col md:flex-row md:items-center gap-3">
+            <div class="md:w-72 min-w-0">
+                <p class="text-white">{{ $member->name }}</p>
+                <p class="text-gray-400 font-mono text-xs break-all">{{ $member->email }}</p>
+            </div>
+            <div class="flex flex-wrap gap-1.5 flex-1">
+                @foreach($member->permissions ?? [] as $key)
+                    @isset(\App\Models\User::MODULES[$key])
+                        <x-admin.badge tone="primary" :icon="\App\Models\User::MODULES[$key]['icon']">{{ \App\Models\User::MODULES[$key]['label'] }}</x-admin.badge>
+                    @endisset
+                @endforeach
+            </div>
+        </div>
+    @empty
+        <p class="px-6 py-8 text-center text-gray-400 text-sm">Aucun membre invité pour l'instant.</p>
+    @endforelse
 </div>
 @endsection

@@ -74,7 +74,7 @@
     </div>
 
     <div class="grid md:grid-cols-2 gap-4">
-        {{-- Approuver : catégorie + tier --}}
+        {{-- Approuver : catégorie (+ tier, fixé par l'admin seul) --}}
         <form method="POST" action="{{ route('moderation.approve', $media->id) }}"
               class="bg-dark-100 rounded-xl border border-green-500/30 p-5 space-y-4"
               data-confirm="Approuver et publier « {{ $media->title }} » ?" data-confirm-type="primary"
@@ -92,6 +92,7 @@
                 </select>
             </div>
 
+            @if(auth()->user()->isAdmin())
             <div>
                 <label class="block text-sm text-gray-300 mb-1">Tier (rémunération)</label>
                 <select name="tier" required
@@ -101,6 +102,13 @@
                     @endforeach
                 </select>
             </div>
+            @else
+            <p class="text-xs text-gray-400">
+                <i class="fas fa-info-circle mr-1"></i>
+                Tier actuel : <span class="text-gray-200 font-medium">{{ ucfirst($media->tier) }}</span>.
+                Il détermine la rémunération des vues et n'est modifiable que par l'administration ABBEV.
+            </p>
+            @endif
 
             <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white font-medium py-2.5 rounded-lg transition">
                 <i class="fas fa-check mr-1"></i> Approuver et publier

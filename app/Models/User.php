@@ -28,6 +28,12 @@ class User extends Authenticatable
         // données personnelles : on les efface avec le compte — après la
         // suppression en base, pour ne rien perdre si elle échoue.
         static::deleting(function (User $user) {
+            // Producteur supprimé : son équipe perd l'accès au panel mais les
+            // comptes restent (certains sont des abonnés de l'app).
+            if ($user->isProducerOwner()) {
+                $user->teamMembers()->get()->each->leaveTeam();
+            }
+
             $user->personalFilesToForget = CastingApplication::where('user_id', $user->id)
                 ->whereNotNull('photo_path')->pluck('photo_path')
                 ->merge(ProjectSubmission::where('user_id', $user->id)->whereNotNull('file_path')->pluck('file_path'))
@@ -51,33 +57,92 @@ class User extends Authenticatable
     }
 
     /**
-     * Rôles disponibles : 'admin' | 'producer' | 'assistant' | 'user'.
+     * Modules d'un espace producteur. Le producteur les a tous ; il en délègue
+     * une sélection à chaque membre de son équipe (colonne `permissions`).
+     */
+    public const MODULES = [
+        'contents'   => ['label' => 'Films, séries & upload vidéos', 'icon' => 'film'],
+        'oeuvres'    => ['label' => 'Œuvres adaptables', 'icon' => 'book-open'],
+        'moderation' => ['label' => 'Modération des contenus', 'icon' => 'clipboard-check'],
+        'audience'   => ['label' => 'Audience des contenus', 'icon' => 'chart-line'],
+        'talents'    => ['label' => 'Talents, agents & casting', 'icon' => 'id-badge'],
+        'awards'     => ['label' => 'Lions Head Awards', 'icon' => 'trophy'],
+        'courses'    => ['label' => 'Formation (cours de cinéma)', 'icon' => 'graduation-cap'],
+        'calls'      => ['label' => 'Appels à projets', 'icon' => 'lightbulb'],
+        'ticketing'  => ['label' => 'Billetterie (séances & codes cinéma)', 'icon' => 'ticket'],
+        'tickets'    => ['label' => 'Contrôle des billets', 'icon' => 'qrcode'],
+    ];
+
+    /**
+     * Rôles disponibles : 'admin' | 'producer' | 'user'.
+     * Un rôle `producer` avec `producer_id` renseigné est un membre de
+     * l'équipe de ce producteur.
      */
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
     }
 
-    /** Producteur : gère uniquement ses propres contenus. */
+    /** Producteur ou membre de son équipe : limité à l'espace du producteur. */
     public function isProducer(): bool
     {
         return $this->role === 'producer';
     }
 
-    /**
-     * Assistant (direction artistique) : valide/rejette les contenus et leur
-     * attribue catégorie + tier. Accès au panel de modération, mais pas à la
-     * gestion (users, forfaits, config…) réservée à l'admin.
-     */
-    public function isAssistant(): bool
+    /** Titulaire d'un espace producteur (tous les modules + gestion de l'équipe). */
+    public function isProducerOwner(): bool
     {
-        return $this->role === 'assistant';
+        return $this->isProducer() && $this->producer_id === null;
     }
 
-    /** Membre du panel (admin, producteur ou assistant) : a accès au dashboard. */
+    /** Membre invité par un producteur (modules limités à ses permissions). */
+    public function isTeamMember(): bool
+    {
+        return $this->isProducer() && $this->producer_id !== null;
+    }
+
+    /** Membre du panel (admin, producteur ou équipe) : a accès au dashboard. */
     public function isStaff(): bool
     {
-        return in_array($this->role, ['admin', 'producer', 'assistant'], true);
+        return in_array($this->role, ['admin', 'producer'], true);
+    }
+
+    /** Id du producteur dont on gère l'espace (NULL pour l'admin et les abonnés). */
+    public function workspaceId(): ?int
+    {
+        if (! $this->isProducer()) {
+            return null;
+        }
+
+        return $this->producer_id ?? $this->id;
+    }
+
+    /** Accès à un module du panel (voir MODULES). */
+    public function canAccessModule(string $module): bool
+    {
+        if ($this->isAdmin() || $this->isProducerOwner()) {
+            return true;
+        }
+
+        return $this->isTeamMember() && in_array($module, $this->permissions ?? [], true);
+    }
+
+    /** Producteur dont ce compte est membre de l'équipe. */
+    public function producer()
+    {
+        return $this->belongsTo(User::class, 'producer_id');
+    }
+
+    /** Équipe invitée par ce producteur. */
+    public function teamMembers()
+    {
+        return $this->hasMany(User::class, 'producer_id');
+    }
+
+    /** Retire le compte de son équipe : il redevient un simple abonné de l'app. */
+    public function leaveTeam(): void
+    {
+        $this->forceFill(['role' => 'user', 'producer_id' => null, 'permissions' => null])->save();
     }
 
     /** Contenus (films/séries) dont cet utilisateur est propriétaire. */
@@ -126,6 +191,7 @@ class User extends Authenticatable
             'phone_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'permissions' => 'array',
         ];
     }
 

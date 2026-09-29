@@ -2,12 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspaceThrough;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Reservation extends Model
 {
-    use HasFactory;
+    use BelongsToWorkspaceThrough, HasFactory;
+
+    public static function workspaceParent(): string
+    {
+        return 'screening';
+    }
 
     protected $fillable = [
         'reference',

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToWorkspaceThrough;
 use App\Concerns\HasObfuscatedRouteKey;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +15,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class AwardNominee extends Model
 {
-    use HasObfuscatedRouteKey;
+    use BelongsToWorkspaceThrough, HasObfuscatedRouteKey;
+
+    public static function workspaceParent(): string
+    {
+        return 'category';
+    }
 
     protected $fillable = [
         'award_category_id', 'media_id', 'talent_id', 'name', 'subtitle',
