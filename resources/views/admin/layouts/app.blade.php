@@ -303,7 +303,13 @@
             @php
                 $__user = auth()->user();
                 $__isAdmin = $__user->isAdmin();
-                $__can = fn (string $module) => $__user->canAccessModule($module);
+                // Espace verrouillé (pack producteur non payé) : aucun module
+                // n'apparaît, seule la page d'abonnement reste proposée.
+                $__locked = $__user->isWorkspaceLocked();
+                $__can = fn (string $module) => ! $__locked && $__user->canAccessModule($module);
+                // Fin de l'abonnement producteur, pour prévenir avant expiration.
+                $__accessEndsAt = $__user->isProducer() && ! $__locked && \App\Models\ProducerPlan::paymentRequired()
+                    ? \App\Models\ProducerSubscription::accessEndsAt($__user->workspaceId()) : null;
                 // Compteurs « à traiter » : un chiffre n'apparaît que s'il
                 // demande une action de l'équipe. Les requêtes sont déjà
                 // cloisonnées à l'espace du producteur (scope `workspace`).
@@ -318,9 +324,16 @@
                     && optional(\App\Models\AwardEdition::where('is_current', true)->first())->isVotingOpen();
             @endphp
             <nav class="flex-1 mt-4 px-3 pb-6 overflow-y-auto abbev-scroll">
+                @if($__locked)
+                <x-admin.nav-link :href="route('producer.subscription.show')" icon="lock" :active="request()->routeIs('producer.subscription.*')"
+                    badge="À activer" badge-class="bg-amber-500 text-dark-100">
+                    Activer mon espace
+                </x-admin.nav-link>
+                @else
                 <x-admin.nav-link :href="route('admin.dashboard')" icon="chart-pie" :active="request()->routeIs('admin.dashboard')">
                     Tableau de bord
                 </x-admin.nav-link>
+                @endif
 
                 {{-- Catalogue : films, séries et leur classement (genres, formats, sélections) --}}
                 @if($__can('contents') || $__can('oeuvres') || $__isAdmin)
@@ -410,9 +423,12 @@
                 </x-admin.nav-group>
                 @endif
 
-                @if($__user->isProducerOwner())
-                <x-admin.nav-group key="equipe" label="Mon espace" :active="request()->routeIs('team.*')">
+                @if($__user->isProducerOwner() && ! $__locked)
+                <x-admin.nav-group key="equipe" label="Mon espace" :active="request()->routeIs('team.*', 'producer.subscription.*')">
                     <x-admin.nav-link :href="route('team.index')" icon="people-group" :active="request()->routeIs('team.*')">Équipe & permissions</x-admin.nav-link>
+                    @if($__accessEndsAt)
+                    <x-admin.nav-link :href="route('producer.subscription.show')" icon="id-card" :active="request()->routeIs('producer.subscription.*')">Mon abonnement</x-admin.nav-link>
+                    @endif
                 </x-admin.nav-group>
                 @endif
 
@@ -424,8 +440,9 @@
                     <x-admin.nav-link :href="route('administrators.index')" icon="user-shield" :active="request()->routeIs('administrators.*')">Administrateurs</x-admin.nav-link>
                 </x-admin.nav-group>
 
-                <x-admin.nav-group key="paiements" label="Abonnements & paiements" :active="request()->routeIs('subscription-plans.*', 'transactions.*', 'earnings.*')">
+                <x-admin.nav-group key="paiements" label="Abonnements & paiements" :active="request()->routeIs('subscription-plans.*', 'producer-plan.*', 'transactions.*', 'earnings.*')">
                     <x-admin.nav-link :href="route('subscription-plans.index')" icon="tags" :active="request()->routeIs('subscription-plans.*')">Packs d'abonnement</x-admin.nav-link>
+                    <x-admin.nav-link :href="route('producer-plan.edit')" icon="clapperboard" :active="request()->routeIs('producer-plan.*')">Pack producteur</x-admin.nav-link>
                     <x-admin.nav-link :href="route('transactions.index')" icon="receipt" :active="request()->routeIs('transactions.*')">Transactions</x-admin.nav-link>
                     <x-admin.nav-link :href="route('earnings.index')" icon="coins" :active="request()->routeIs('earnings.*')">Revenus producteurs</x-admin.nav-link>
                 </x-admin.nav-group>
@@ -492,6 +509,19 @@
 
             <!-- Page Content -->
             <main class="flex-1 overflow-y-auto p-6 abbev-scroll">
+                {{-- Abonnement producteur bientôt expiré : l'espace se verrouillera à l'échéance. --}}
+                @if($__accessEndsAt && $__accessEndsAt->lte(now()->addDays(7)) && ! request()->routeIs('producer.subscription.*'))
+                    <div class="mb-6 bg-amber-500/10 border-l-4 border-amber-500 text-amber-200 px-4 py-3 rounded-lg flex flex-wrap items-center gap-3 shadow-sm">
+                        <i class="fas fa-hourglass-half text-amber-400"></i>
+                        <p class="flex-1 text-sm">
+                            Votre abonnement producteur se termine le <strong>{{ $__accessEndsAt->format('d/m/Y') }}</strong> : l'espace sera verrouillé à cette date.
+                        </p>
+                        @if($__user->isProducerOwner())
+                            <a href="{{ route('producer.subscription.show') }}" class="bg-amber-500 hover:bg-amber-400 text-dark-100 font-semibold px-3 py-1.5 rounded-lg text-sm transition">Renouveler</a>
+                        @endif
+                    </div>
+                @endif
+
                 <!-- Flash Messages -->
                 @if(session('success'))
                     <div class="mb-6 bg-green-50 border-l-4 border-green-500 text-green-700 px-4 py-3 rounded-lg flex items-center justify-between shadow-sm" role="alert">

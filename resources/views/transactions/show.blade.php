@@ -86,7 +86,7 @@
                 <!-- Type -->
                 <div>
                     <p class="text-sm text-gray-400 mb-1">Type</p>
-                    <p class="text-lg font-medium text-white capitalize">{{ $transaction->type }}</p>
+                    <p class="text-lg font-medium text-white capitalize">{{ $transaction->type === 'producer_subscription' ? 'Pack producteur' : $transaction->type }}</p>
                 </div>
 
                 <!-- External Reference -->

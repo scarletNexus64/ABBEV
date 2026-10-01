@@ -55,6 +55,72 @@
     </div>
 </div>
 
+<!-- Abonnement producteur -->
+<x-admin.card class="mb-6" title="Abonnement producteur" icon="lock"
+    :subtitle="$access['payment_required'] ? 'Sans abonnement en cours, son espace est entièrement verrouillé (équipe comprise).' : 'Pack producteur désactivé : son espace est ouvert sans paiement.'">
+    <div class="flex flex-col lg:flex-row lg:items-center gap-5">
+        <div class="flex-1 min-w-0">
+            @if($access['ends_at'])
+                <x-admin.badge tone="emerald" icon="lock-open">Actif</x-admin.badge>
+                <p class="text-white mt-2">Accès jusqu'au <strong>{{ $access['ends_at']->format('d/m/Y') }}</strong></p>
+            @elseif($access['payment_required'])
+                <x-admin.badge tone="amber" icon="lock">Verrouillé</x-admin.badge>
+                <p class="text-gray-400 mt-2 text-sm">Aucune période payée ou offerte en cours.</p>
+            @else
+                <x-admin.badge tone="gray" icon="lock-open">Ouvert (paiement non exigé)</x-admin.badge>
+            @endif
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <form action="{{ route('producers.access.grant', $user) }}" method="POST" class="flex items-center gap-2"
+                  data-confirm="Offrir l'accès à l'espace de {{ $user->name }} sans paiement ? La période s'ajoute après l'accès en cours."
+                  data-confirm-type="primary" data-confirm-confirm="Offrir">
+                @csrf
+                <select name="months" class="bg-dark-50 border border-dark-200 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary-500">
+                    @foreach([1 => '1 mois', 3 => '3 mois', 6 => '6 mois', 12 => '1 an', 24 => '2 ans'] as $months => $label)
+                        <option value="{{ $months }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                <button type="submit" class="bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-white px-4 py-2 rounded-lg text-sm transition">
+                    <i class="fas fa-gift mr-1"></i> Offrir l'accès
+                </button>
+            </form>
+            @if($access['ends_at'])
+                <form action="{{ route('producers.access.revoke', $user) }}" method="POST"
+                      data-confirm="Couper l'accès de {{ $user->name }} ? Les périodes en cours et à venir (payées ou offertes) sont annulées et son espace est verrouillé immédiatement."
+                      data-confirm-type="danger" data-confirm-title="Couper l'accès" data-confirm-confirm="Couper l'accès">
+                    @csrf @method('DELETE')
+                    <button type="submit" class="bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white px-4 py-2 rounded-lg text-sm transition">
+                        <i class="fas fa-lock mr-1"></i> Couper l'accès
+                    </button>
+                </form>
+            @endif
+        </div>
+    </div>
+
+    @if($access['history']->isNotEmpty())
+        <div class="mt-5 border-t border-dark-200 pt-4 space-y-2">
+            @foreach($access['history'] as $period)
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                    <span class="text-gray-300 w-48">{{ $period->starts_at->format('d/m/Y') }} → {{ $period->expires_at->format('d/m/Y') }}</span>
+                    @if($period->source === 'admin')
+                        <x-admin.badge tone="violet" icon="gift">Offert{{ $period->grantedBy ? ' par ' . $period->grantedBy->name : '' }}</x-admin.badge>
+                    @else
+                        <x-admin.badge tone="sky" icon="receipt">
+                            Payé{{ $period->transaction ? ' · ' . number_format((float) $period->transaction->amount, 0, ',', ' ') . ' FCFA · ' . ($period->transaction->payment_method === 'stripe' ? 'carte' : 'Mobile Money') : '' }}
+                        </x-admin.badge>
+                    @endif
+                    @if($period->status === 'cancelled')
+                        <x-admin.badge tone="rose">Annulé</x-admin.badge>
+                    @elseif($period->expires_at->isPast())
+                        <x-admin.badge>Terminé</x-admin.badge>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+    @endif
+</x-admin.card>
+
 <!-- Stats -->
 <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
     @php

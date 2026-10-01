@@ -139,6 +139,27 @@ class User extends Authenticatable
         return $this->hasMany(User::class, 'producer_id');
     }
 
+    /** Périodes d'accès à l'espace (payées ou offertes), pour le producteur titulaire. */
+    public function producerSubscriptions()
+    {
+        return $this->hasMany(ProducerSubscription::class, 'producer_id');
+    }
+
+    /**
+     * Espace producteur verrouillé : le pack producteur est actif et le
+     * titulaire n'a aucune période payée (ou offerte) en cours. Tout l'espace
+     * est alors fermé, équipe comprise, jusqu'au paiement.
+     */
+    public function isWorkspaceLocked(): bool
+    {
+        if (! $this->isProducer()) {
+            return false;
+        }
+
+        return ProducerPlan::paymentRequired()
+            && ! ProducerSubscription::coversNow($this->workspaceId());
+    }
+
     /** Retire le compte de son équipe : il redevient un simple abonné de l'app. */
     public function leaveTeam(): void
     {

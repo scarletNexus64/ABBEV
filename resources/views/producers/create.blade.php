@@ -62,6 +62,21 @@
             </div>
         </div>
 
+        @if(\App\Models\ProducerPlan::paymentRequired())
+        <div class="mb-8 bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+            <div class="flex items-start gap-3">
+                <i class="fas fa-lock text-amber-400 text-xl mt-1"></i>
+                <div>
+                    <p class="text-amber-200 font-medium mb-1">Espace verrouillé jusqu'au paiement</p>
+                    <p class="text-amber-100/80 text-sm">
+                        Le producteur devra souscrire au pack producteur pour accéder à son espace. Tu peux aussi lui
+                        offrir l'accès depuis sa fiche.
+                    </p>
+                </div>
+            </div>
+        </div>
+        @endif
+
         <div class="flex gap-4">
             <button type="submit" class="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-lg transition flex-1">
                 <i class="fas fa-check mr-2"></i> Créer le producteur

@@ -27,6 +27,10 @@ return Application::configure(basePath: dirname(__DIR__))
             prepend: \App\Http\Middleware\ScopeToWorkspace::class,
         );
 
+        // Espace producteur verrouillé tant que le pack producteur n'est pas
+        // payé : seule la page d'abonnement reste accessible.
+        $middleware->appendToGroup('web', \App\Http\Middleware\EnsureWorkspaceSubscription::class);
+
         $middleware->alias([
             'admin'  => \App\Http\Middleware\EnsureIsAdmin::class,
             'role'   => \App\Http\Middleware\EnsureRole::class,

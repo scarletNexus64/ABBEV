@@ -75,6 +75,15 @@ Route::middleware(['auth', 'role:admin,producer', 'module:audience'])->group(fun
     Route::get('/audience', [App\Http\Controllers\Admin\AudienceController::class, 'index'])->name('audience.index');
 });
 
+// Abonnement au pack producteur : seule page ouverte à un espace verrouillé
+// (EnsureWorkspaceSubscription). Le titulaire y paie par Mobile Money ou carte.
+Route::middleware(['auth', 'role:producer'])->prefix('admin/mon-abonnement')->name('producer.subscription.')->group(function () {
+    Route::get('/', [App\Http\Controllers\Admin\ProducerSubscriptionController::class, 'show'])->name('show');
+    Route::post('/kpay', [App\Http\Controllers\Admin\ProducerSubscriptionController::class, 'payKpay'])->middleware('throttle:10,1')->name('kpay');
+    Route::post('/stripe', [App\Http\Controllers\Admin\ProducerSubscriptionController::class, 'payStripe'])->middleware('throttle:10,1')->name('stripe');
+    Route::get('/paiements/{transaction}', [App\Http\Controllers\Admin\ProducerSubscriptionController::class, 'status'])->name('status');
+});
+
 // Équipe du producteur (réservée au producteur titulaire de l'espace)
 Route::middleware(['auth', 'role:producer'])->prefix('admin/team')->name('team.')->group(function () {
     Route::get('/', [App\Http\Controllers\Admin\TeamController::class, 'index'])->name('index');
@@ -172,6 +181,12 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->group(function () {
     Route::get('/producers/{user}', [ProducerController::class, 'show'])->name('producers.show');
     Route::post('/producers/{user}/resend', [ProducerController::class, 'resend'])->name('producers.resend');
     Route::delete('/producers/{user}', [ProducerController::class, 'destroy'])->name('producers.destroy');
+    Route::post('/producers/{user}/access', [ProducerController::class, 'grantAccess'])->name('producers.access.grant');
+    Route::delete('/producers/{user}/access', [ProducerController::class, 'revokeAccess'])->name('producers.access.revoke');
+
+    // Pack producteur (un seul) : prix et période de l'abonnement des producteurs
+    Route::get('/producer-plan', [App\Http\Controllers\Admin\ProducerPlanController::class, 'edit'])->name('producer-plan.edit');
+    Route::put('/producer-plan', [App\Http\Controllers\Admin\ProducerPlanController::class, 'update'])->name('producer-plan.update');
 
     // Transfert de données (plateforme ou producteur → producteur)
     Route::get('/transfers', [App\Http\Controllers\Admin\DataTransferController::class, 'index'])->name('transfers.index');

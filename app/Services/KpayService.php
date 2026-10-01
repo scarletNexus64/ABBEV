@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Configuration;
+use App\Models\ProducerSubscription;
 use App\Models\Transaction;
 use App\Models\UserSubscription;
 use App\Services\ReservationService;
@@ -209,6 +210,9 @@ class KpayService
                 } elseif ($transaction->type === 'purchase') {
                     // Réservation de ticket : confirmer + décompter le stock.
                     app(ReservationService::class)->confirmFromTransaction($transaction);
+                } elseif ($transaction->type === 'producer_subscription') {
+                    // Pack producteur payé depuis le dashboard : ouvre l'espace.
+                    ProducerSubscription::provisionFromTransaction($transaction);
                 }
 
                 Log::info('[KpayService] Transaction reconciled as completed', [

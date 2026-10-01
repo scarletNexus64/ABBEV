@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Mail\ProducerCredentialsMail;
+use App\Models\ProducerPlan;
+use App\Models\ProducerSubscription;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -28,10 +30,14 @@ class ProducerController extends Controller
         $producers = User::where('role', 'producer')
             ->whereNull('producer_id')
             ->withCount(['media', 'teamMembers'])
+            // Fin de l'accès payé ou offert (périodes enchaînées) : NULL = verrouillé.
+            ->withMax(['producerSubscriptions as access_ends_at' => fn ($q) => $q->unexpired()], 'expires_at')
             ->latest()
             ->paginate(20);
 
-        return view('producers.index', compact('producers'));
+        $paymentRequired = ProducerPlan::paymentRequired();
+
+        return view('producers.index', compact('producers', 'paymentRequired'));
     }
 
     public function create()
@@ -57,7 +63,46 @@ class ProducerController extends Controller
             'views'  => (int) $media->sum('views_count'),
         ];
 
-        return view('producers.show', compact('user', 'media', 'stats', 'team'));
+        $access = [
+            'payment_required' => ProducerPlan::paymentRequired(),
+            'ends_at' => ProducerSubscription::accessEndsAt($user->id),
+            'history' => $user->producerSubscriptions()->with(['transaction', 'grantedBy'])
+                ->latest('starts_at')->limit(10)->get(),
+        ];
+
+        return view('producers.show', compact('user', 'media', 'stats', 'team', 'access'));
+    }
+
+    /** Offre (ou prolonge) l'accès à l'espace, sans paiement. */
+    public function grantAccess(Request $request, User $user)
+    {
+        if (! $user->isProducerOwner()) {
+            return back()->with('error', "Cet utilisateur n'est pas un producteur.");
+        }
+
+        $validated = $request->validate([
+            'months' => 'required|integer|min:1|max:36',
+        ]);
+
+        $period = ProducerSubscription::grant($user, $validated['months'], $request->user());
+
+        return back()->with('success', sprintf(
+            'Accès offert à %s jusqu\'au %s.',
+            $user->name,
+            $period->expires_at->format('d/m/Y'),
+        ));
+    }
+
+    /** Coupe l'accès en cours : l'espace est de nouveau verrouillé. */
+    public function revokeAccess(User $user)
+    {
+        if (! $user->isProducerOwner()) {
+            return back()->with('error', "Cet utilisateur n'est pas un producteur.");
+        }
+
+        ProducerSubscription::revoke($user);
+
+        return back()->with('success', "Accès de {$user->name} coupé : son espace est verrouillé jusqu'au prochain paiement.");
     }
 
     public function store(Request $request)

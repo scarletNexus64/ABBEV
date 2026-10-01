@@ -22,6 +22,8 @@ class TransactionApiController extends Controller
         $perPage = max(5, min(50, $perPage));
 
         $page = Transaction::where('user_id', $user->id)
+            // Pack producteur : payé depuis le dashboard, étranger à l'app.
+            ->where('type', '!=', 'producer_subscription')
             ->orderByDesc('created_at')
             ->paginate($perPage);
 
@@ -58,6 +60,7 @@ class TransactionApiController extends Controller
         $user = $request->user();
 
         $transaction = Transaction::where('user_id', $user->id)
+            ->where('type', '!=', 'producer_subscription')
             ->where('payment_method', 'kpay')
             ->where('status', 'pending')
             ->where('created_at', '>=', now()->subMinutes(30))

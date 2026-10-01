@@ -69,6 +69,7 @@
                         <th class="text-left px-6 py-3">Email</th>
                         <th class="text-left px-6 py-3">Contenus</th>
                         <th class="text-left px-6 py-3">Équipe</th>
+                        <th class="text-left px-6 py-3">Abonnement</th>
                         <th class="text-left px-6 py-3">Créé</th>
                         <th class="text-right px-6 py-3">Actions</th>
                     </tr>
@@ -87,6 +88,15 @@
                             <td class="px-6 py-3 text-gray-300 font-mono">{{ $producer->email }}</td>
                             <td class="px-6 py-3 text-gray-400">{{ $producer->media_count }}</td>
                             <td class="px-6 py-3 text-gray-400">{{ $producer->team_members_count }}</td>
+                            <td class="px-6 py-3">
+                                @if($producer->access_ends_at)
+                                    <x-admin.badge tone="emerald" icon="lock-open">Jusqu'au {{ \Illuminate\Support\Carbon::parse($producer->access_ends_at)->format('d/m/Y') }}</x-admin.badge>
+                                @elseif($paymentRequired)
+                                    <x-admin.badge tone="amber" icon="lock">Verrouillé</x-admin.badge>
+                                @else
+                                    <span class="text-gray-500">—</span>
+                                @endif
+                            </td>
                             <td class="px-6 py-3 text-gray-500">{{ $producer->created_at?->diffForHumans() }}</td>
                             <td class="px-6 py-3 text-right">
                                 <div class="inline-flex items-center gap-2">
@@ -114,7 +124,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="px-6 py-10 text-center text-gray-500">
+                        <tr><td colspan="7" class="px-6 py-10 text-center text-gray-500">
                             <i class="fas fa-clapperboard text-3xl mb-2 block opacity-50"></i>
                             Aucun producteur. Cliquez sur « Ajouter un producteur ».
                         </td></tr>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ProducerSubscription;
 use App\Models\Transaction;
 use App\Models\UserSubscription;
 use App\Services\ReservationService;
@@ -97,6 +98,8 @@ class StripeWebhookController extends Controller
             UserSubscription::provisionFromTransaction($transaction);
         } elseif ($transaction->type === 'purchase') {
             $this->reservations->confirmFromTransaction($transaction);
+        } elseif ($transaction->type === 'producer_subscription') {
+            ProducerSubscription::provisionFromTransaction($transaction);
         }
 
         Log::info('[StripeWebhook] Transaction confirmée', [
